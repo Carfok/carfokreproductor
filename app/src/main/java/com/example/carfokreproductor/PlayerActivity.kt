@@ -13,6 +13,13 @@ import android.graphics.Color
 import androidx.core.graphics.toColorInt
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.core.app.NotificationCompat
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.Intent
+import android.graphics.BitmapFactory
+import android.os.Build
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -22,7 +29,6 @@ class PlayerActivity : AppCompatActivity() {
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnable: Runnable
 
-    // Vistas (Declararlas aquí evita errores de hilos)
     private lateinit var tvTitle: TextView
     private lateinit var btnPlayPause: ImageButton
 
@@ -32,16 +38,17 @@ class PlayerActivity : AppCompatActivity() {
     private var isRepeat: Boolean = false
     private var isShuffle: Boolean = false
 
+    // ID del canal de notificación
+    private val CHANNEL_ID = "carfok_music_channel"
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_player)
 
-        // 1. Recuperar datos
         songList = intent.getStringArrayListExtra("SONG_LIST") ?: arrayListOf()
         folderPath = intent.getStringExtra("FOLDER_PATH")
         currentPosition = intent.getIntExtra("POSITION", 0)
 
-        // 2. Vincular Vistas
         tvTitle = findViewById(R.id.tvPlayerTitle)
         btnPlayPause = findViewById(R.id.btnPlayPause)
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
@@ -50,10 +57,10 @@ class PlayerActivity : AppCompatActivity() {
         val btnShuffle = findViewById<ImageButton>(R.id.btnShuffle)
         seekBar = findViewById(R.id.playerSeekBar)
 
-        // 3. Inicializar Sesión
+        // Crear el canal de notificación
+        createNotificationChannel()
         setupMediaSession()
 
-        // 4. Lógica de Botones
         btnPlayPause.setOnClickListener { togglePlayPause() }
 
         btnRepeat.setOnClickListener {
@@ -77,8 +84,59 @@ class PlayerActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(p0: SeekBar?) {}
         })
 
-        // 5. Iniciar
         playSong()
+    }
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Reproducción de Música",
+                NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Controles del reproductor Carfok"
+                setShowBadge(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
+        }
+    }
+
+    private fun showNotification(isPlaying: Boolean) {
+        val songName = songList[currentPosition]
+
+        // Intent para que al tocar la notificación vuelva a la app
+        val intent = Intent(this, PlayerActivity::class.java)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setSmallIcon(R.drawable.play_circle_24px) // Asegúrate que este icono existe
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.play_circle_24px))
+            .setContentTitle(songName)
+            .setContentText("Carfok Music Player")
+            .setContentIntent(pendingIntent)
+            // Estilo Multimedia
+            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
+                .setMediaSession(mediaSession.sessionToken)
+                .setShowActionsInCompactView(0, 1, 2))
+            // Botón Anterior (Acción 0)
+            .addAction(R.drawable.skip_previous_24px, "Anterior", null)
+            // Botón Play/Pause (Acción 1)
+            .addAction(
+                if (isPlaying) R.drawable.pause_circle_24px else R.drawable.play_circle_24px,
+                if (isPlaying) "Pausa" else "Play",
+                null
+            )
+            // Botón Siguiente (Acción 2)
+            .addAction(R.drawable.skip_next_24px, "Siguiente", null)
+            .setOngoing(isPlaying) // La notificación no se puede borrar si está sonando
+            .build()
+
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.notify(1, notification)
     }
 
     private fun setupMediaSession() {
@@ -94,17 +152,18 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun togglePlayPause() {
-        // Ejecutamos siempre en el hilo principal para la UI
         runOnUiThread {
             mediaPlayer?.let { mp ->
                 if (mp.isPlaying) {
                     mp.pause()
                     btnPlayPause.setImageResource(R.drawable.play_circle_24px)
                     updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+                    showNotification(false) // Actualizar notificación a PAUSA
                 } else {
                     mp.start()
                     btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
                     updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                    showNotification(true) // Actualizar notificación a PLAY
                     updateSeekBar()
                 }
             }
@@ -113,11 +172,9 @@ class PlayerActivity : AppCompatActivity() {
 
     private fun playSong() {
         if (songList.isEmpty() || folderPath == null) return
-
         val songName = songList[currentPosition]
         val fullPath = File(folderPath, songName).absolutePath
 
-        // Actualizar UI inmediatamente
         runOnUiThread {
             tvTitle.text = songName
             btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
@@ -138,6 +195,7 @@ class PlayerActivity : AppCompatActivity() {
                 }
             }
             updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+            showNotification(true) // Mostrar notificación al iniciar nueva canción
         } catch (e: Exception) {
             e.printStackTrace()
         }
@@ -176,7 +234,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun updateSeekBar() {
-        handler.removeCallbacksAndMessages(null) // Limpiar handlers previos
+        handler.removeCallbacksAndMessages(null)
         runnable = Runnable {
             mediaPlayer?.let {
                 if (it.isPlaying) {
@@ -192,6 +250,9 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         mediaSession.release()
         handler.removeCallbacksAndMessages(null)
+        // Quitar la notificación al cerrar la app
+        val manager = getSystemService(NotificationManager::class.java)
+        manager.cancel(1)
         mediaPlayer?.release()
         mediaPlayer = null
     }

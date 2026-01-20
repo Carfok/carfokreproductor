@@ -1,6 +1,9 @@
 package com.example.carfokreproductor
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.os.Environment
 import android.view.LayoutInflater
@@ -9,6 +12,9 @@ import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.widget.SearchView
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
@@ -16,7 +22,6 @@ import java.util.*
 
 class ListActivity : AppCompatActivity() {
 
-    // Listas para manejar el filtrado
     private var songNamesFull: List<String> = listOf()
     private lateinit var adapter: SongAdapter
 
@@ -24,12 +29,22 @@ class ListActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_list)
 
+        // --- BLOQUE DE PERMISOS PARA NOTIFICACIONES (Android 13+) ---
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(
+                    this,
+                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
+                    101
+                )
+            }
+        }
+
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewSongs)
         val searchView = findViewById<SearchView>(R.id.searchView)
-
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // 1. RUTA Y LECTURA
         val folderPath = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "CarfokMusic")
         if (!folderPath.exists()) folderPath.mkdirs()
 
@@ -40,7 +55,6 @@ class ListActivity : AppCompatActivity() {
 
         songNamesFull = songFiles.map { it.name }
 
-        // 2. CONFIGURAR ADAPTADOR (Usamos una copia para la visualización inicial)
         adapter = SongAdapter(ArrayList(songNamesFull)) { songName ->
             val intent = Intent(this, PlayerActivity::class.java)
             intent.putStringArrayListExtra("SONG_LIST", ArrayList(songNamesFull))
@@ -50,10 +64,8 @@ class ListActivity : AppCompatActivity() {
         }
         recyclerView.adapter = adapter
 
-        // 3. LÓGICA DEL BUSCADOR
         searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
             override fun onQueryTextSubmit(query: String?): Boolean = false
-
             override fun onQueryTextChange(newText: String?): Boolean {
                 filter(newText)
                 return true
@@ -71,9 +83,8 @@ class ListActivity : AppCompatActivity() {
         adapter.updateList(filteredList)
     }
 
-    // --- ADAPTADOR ACTUALIZADO ---
     class SongAdapter(
-        private var songs: MutableList<String>,
+        private var songs: ArrayList<String>,
         private val onItemClick: (String) -> Unit
     ) : RecyclerView.Adapter<SongAdapter.ViewHolder>() {
 
@@ -82,8 +93,28 @@ class ListActivity : AppCompatActivity() {
         }
 
         fun updateList(newList: List<String>) {
-            songs = newList.toMutableList()
-            notifyDataSetChanged()
+            val diffCallback = object : DiffUtil.Callback() {
+                override fun getOldListSize(): Int = songs.size
+                override fun getNewListSize(): Int = newList.size
+
+                override fun areItemsTheSame(oldPos: Int, newPos: Int): Boolean {
+                    // Comparamos si es la misma canción por el nombre
+                    return songs[oldPos] == newList[newPos]
+                }
+
+                override fun areContentsTheSame(oldPos: Int, newPos: Int): Boolean {
+                    // En este caso, el contenido es el mismo que el item
+                    return songs[oldPos] == newList[newPos]
+                }
+            }
+
+            val diffResult = DiffUtil.calculateDiff(diffCallback)
+
+            songs.clear()
+            songs.addAll(newList)
+
+            // Esto sustituye al notifyDataSetChanged y quita el warning
+            diffResult.dispatchUpdatesTo(this)
         }
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
