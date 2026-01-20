@@ -11,8 +11,10 @@ appcompat = "1.6.1"
 material = "1.11.0"
 constraintlayout = "2.1.4"
 composeBom = "2024.09.00"
+media = "1.7.0"
 
 [libraries]
+androidx-media = { group = "androidx.media", name = "media", version.ref = "media" }
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 androidx-constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }

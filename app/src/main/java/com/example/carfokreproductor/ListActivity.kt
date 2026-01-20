@@ -8,54 +8,72 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.widget.SearchView
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.io.File
+import java.util.*
 
 class ListActivity : AppCompatActivity() {
+
+    // Listas para manejar el filtrado
+    private var songNamesFull: List<String> = listOf()
+    private lateinit var adapter: SongAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_list)
 
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewSongs)
+        val searchView = findViewById<SearchView>(R.id.searchView)
+
         recyclerView.layoutManager = LinearLayoutManager(this)
 
-        // 1. DEFINIR LA RUTA ÚNICA (Pública)
-        val folderPath = File(
-            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC),
-            "CarfokMusic"
-        )
+        // 1. RUTA Y LECTURA
+        val folderPath = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "CarfokMusic")
+        if (!folderPath.exists()) folderPath.mkdirs()
 
-        // 2. CREAR LA CARPETA SI NO EXISTE
-        if (!folderPath.exists()) {
-            folderPath.mkdirs()
-        }
-
-        // 3. LEER ARCHIVOS
         val extensionesAceptadas = listOf("mp3", "wav", "aac", "ogg", "m4a", "flac")
         val songFiles = folderPath.listFiles { file ->
             file.isFile && extensionesAceptadas.contains(file.extension.lowercase())
         }?.sortedBy { it.name } ?: emptyList()
 
-        val songNames = songFiles.map { it.name }
+        songNamesFull = songFiles.map { it.name }
 
-        // 4. CONFIGURAR ADAPTADOR
-        recyclerView.adapter = SongAdapter(songNames) { songName ->
+        // 2. CONFIGURAR ADAPTADOR (Usamos una copia para la visualización inicial)
+        adapter = SongAdapter(ArrayList(songNamesFull)) { songName ->
             val intent = Intent(this, PlayerActivity::class.java)
-
-            // IMPORTANTE: Usamos la misma 'folderPath' que definimos arriba
-            intent.putStringArrayListExtra("SONG_LIST", ArrayList(songNames))
-            intent.putExtra("FOLDER_PATH", folderPath.absolutePath) // RUTA CORRECTA
-            intent.putExtra("POSITION", songNames.indexOf(songName))
-
+            intent.putStringArrayListExtra("SONG_LIST", ArrayList(songNamesFull))
+            intent.putExtra("FOLDER_PATH", folderPath.absolutePath)
+            intent.putExtra("POSITION", songNamesFull.indexOf(songName))
             startActivity(intent)
         }
+        recyclerView.adapter = adapter
+
+        // 3. LÓGICA DEL BUSCADOR
+        searchView.setOnQueryTextListener(object : SearchView.OnQueryTextListener {
+            override fun onQueryTextSubmit(query: String?): Boolean = false
+
+            override fun onQueryTextChange(newText: String?): Boolean {
+                filter(newText)
+                return true
+            }
+        })
     }
 
-    // --- CLASE INTERNA DEL ADAPTADOR ---
+    private fun filter(text: String?) {
+        val filteredList = ArrayList<String>()
+        for (item in songNamesFull) {
+            if (item.lowercase(Locale.ROOT).contains(text?.lowercase(Locale.ROOT) ?: "")) {
+                filteredList.add(item)
+            }
+        }
+        adapter.updateList(filteredList)
+    }
+
+    // --- ADAPTADOR ACTUALIZADO ---
     class SongAdapter(
-        private val songs: List<String>,
+        private var songs: MutableList<String>,
         private val onItemClick: (String) -> Unit
     ) : RecyclerView.Adapter<SongAdapter.ViewHolder>() {
 
@@ -63,9 +81,13 @@ class ListActivity : AppCompatActivity() {
             val tvTitle: TextView = view.findViewById(R.id.tvSongTitle)
         }
 
+        fun updateList(newList: List<String>) {
+            songs = newList.toMutableList()
+            notifyDataSetChanged()
+        }
+
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
-            val view = LayoutInflater.from(parent.context)
-                .inflate(R.layout.item_song, parent, false)
+            val view = LayoutInflater.from(parent.context).inflate(R.layout.item_song, parent, false)
             return ViewHolder(view)
         }
 

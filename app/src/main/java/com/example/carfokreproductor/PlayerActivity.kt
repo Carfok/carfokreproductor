@@ -11,15 +11,21 @@ import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import android.graphics.Color
 import androidx.core.graphics.toColorInt
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 
 class PlayerActivity : AppCompatActivity() {
 
+    private lateinit var mediaSession: MediaSessionCompat
     private var mediaPlayer: MediaPlayer? = null
     private lateinit var seekBar: SeekBar
-    private var handler = Handler(Looper.getMainLooper())
+    private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnable: Runnable
 
-    // Nuevas variables de control
+    // Vistas (Declararlas aquí evita errores de hilos)
+    private lateinit var tvTitle: TextView
+    private lateinit var btnPlayPause: ImageButton
+
     private var songList: ArrayList<String> = arrayListOf()
     private var folderPath: String? = null
     private var currentPosition: Int = 0
@@ -35,54 +41,34 @@ class PlayerActivity : AppCompatActivity() {
         folderPath = intent.getStringExtra("FOLDER_PATH")
         currentPosition = intent.getIntExtra("POSITION", 0)
 
-        // Vincular Vistas
+        // 2. Vincular Vistas
+        tvTitle = findViewById(R.id.tvPlayerTitle)
+        btnPlayPause = findViewById(R.id.btnPlayPause)
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
         val btnPrev = findViewById<ImageButton>(R.id.btnPrev)
         val btnRepeat = findViewById<ImageButton>(R.id.btnRepeat)
         val btnShuffle = findViewById<ImageButton>(R.id.btnShuffle)
-        val btnPlayPause = findViewById<ImageButton>(R.id.btnPlayPause)
         seekBar = findViewById(R.id.playerSeekBar)
 
-        // 2. LÓGICA ÚNICA DEL BOTÓN PLAY/PAUSE
-        btnPlayPause.setOnClickListener {
-            mediaPlayer?.let { mp ->
-                if (mp.isPlaying) {
-                    mp.pause()
-                    btnPlayPause.setImageResource(R.drawable.play_circle_24px)
-                    // Animación opcional
-                    btnPlayPause.animate().scaleX(1.1f).scaleY(1.1f).setDuration(100).withEndAction {
-                        btnPlayPause.animate().scaleX(1f).scaleY(1f).setDuration(100)
-                    }
-                } else {
-                    mp.start()
-                    btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
-                    updateSeekBar()
-                    // Animación opcional
-                    btnPlayPause.animate().scaleX(1.2f).scaleY(1.2f).setDuration(100).withEndAction {
-                        btnPlayPause.animate().scaleX(1f).scaleY(1f).setDuration(100)
-                    }
-                }
-            }
-        }
+        // 3. Inicializar Sesión
+        setupMediaSession()
 
-        // 3. LÓGICA DE REPETIR Y SHUFFLE (Sin duplicados)
+        // 4. Lógica de Botones
+        btnPlayPause.setOnClickListener { togglePlayPause() }
+
         btnRepeat.setOnClickListener {
             isRepeat = !isRepeat
-            val color = if (isRepeat) "#2196F3".toColorInt() else Color.WHITE
-            btnRepeat.setColorFilter(color)
+            btnRepeat.setColorFilter(if (isRepeat) "#2196F3".toColorInt() else Color.WHITE)
         }
 
         btnShuffle.setOnClickListener {
             isShuffle = !isShuffle
-            val color = if (isShuffle) "#2196F3".toColorInt() else Color.WHITE
-            btnShuffle.setColorFilter(color)
+            btnShuffle.setColorFilter(if (isShuffle) "#2196F3".toColorInt() else Color.WHITE)
         }
 
-        // 4. OTROS CONTROLES
         btnNext.setOnClickListener { nextSong() }
         btnPrev.setOnClickListener { prevSong() }
 
-        // SeekBar manual
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
                 if (fromUser) mediaPlayer?.seekTo(p)
@@ -91,16 +77,51 @@ class PlayerActivity : AppCompatActivity() {
             override fun onStopTrackingTouch(p0: SeekBar?) {}
         })
 
-        // 5. Iniciar canción
+        // 5. Iniciar
         playSong()
     }
+
+    private fun setupMediaSession() {
+        mediaSession = MediaSessionCompat(this, "CarfokMusicSession")
+        mediaSession.setCallback(object : MediaSessionCompat.Callback() {
+            override fun onPlay() { togglePlayPause() }
+            override fun onPause() { togglePlayPause() }
+            override fun onSkipToNext() { nextSong() }
+            override fun onSkipToPrevious() { prevSong() }
+            override fun onSeekTo(pos: Long) { mediaPlayer?.seekTo(pos.toInt()) }
+        })
+        mediaSession.isActive = true
+    }
+
+    private fun togglePlayPause() {
+        // Ejecutamos siempre en el hilo principal para la UI
+        runOnUiThread {
+            mediaPlayer?.let { mp ->
+                if (mp.isPlaying) {
+                    mp.pause()
+                    btnPlayPause.setImageResource(R.drawable.play_circle_24px)
+                    updatePlaybackState(PlaybackStateCompat.STATE_PAUSED)
+                } else {
+                    mp.start()
+                    btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
+                    updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+                    updateSeekBar()
+                }
+            }
+        }
+    }
+
     private fun playSong() {
+        if (songList.isEmpty() || folderPath == null) return
+
         val songName = songList[currentPosition]
-        findViewById<TextView>(R.id.tvPlayerTitle).text = songName
         val fullPath = File(folderPath, songName).absolutePath
 
-        val btnPlayPause = findViewById<ImageButton>(R.id.btnPlayPause)
-        btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
+        // Actualizar UI inmediatamente
+        runOnUiThread {
+            tvTitle.text = songName
+            btnPlayPause.setImageResource(R.drawable.pause_circle_24px)
+        }
 
         try {
             mediaPlayer?.stop()
@@ -112,42 +133,18 @@ class PlayerActivity : AppCompatActivity() {
                 seekBar.max = duration
                 updateSeekBar()
 
-                // LÓGICA AUTOMÁTICA AL ACABAR
                 setOnCompletionListener {
-                    if (isRepeat) {
-                        playSong() // Repetir la misma
-                    } else {
-                        nextSong() // Pasar a la siguiente
-                    }
+                    if (isRepeat) playSong() else nextSong()
                 }
             }
-        } catch (e: Exception) { e.printStackTrace() }
+            updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     private fun nextSong() {
-        if (songList.isEmpty()) return // Seguridad: si no hay canciones, no hacer nada
-
-        if (isShuffle) {
-            // Si hay más de una canción, buscamos una que no sea la actual
-            if (songList.size > 1) {
-                var newPosition: Int
-                do {
-                    newPosition = (0 until songList.size).random()
-                } while (newPosition == currentPosition) // Se repite si sale la misma
-                currentPosition = newPosition
-            }
-            // Si solo hay una canción, se quedará en esa (no hay otra opción)
-        } else {
-            // Modo normal: siguiente en la lista (y vuelve al principio al terminar)
-            currentPosition = (currentPosition + 1) % songList.size
-        }
-
-        playSong()
-    }
-
-    private fun prevSong() {
         if (songList.isEmpty()) return
-
         if (isShuffle && songList.size > 1) {
             var newPosition: Int
             do {
@@ -155,18 +152,37 @@ class PlayerActivity : AppCompatActivity() {
             } while (newPosition == currentPosition)
             currentPosition = newPosition
         } else {
-            // Modo normal: anterior o última si está en la primera
-            currentPosition = if (currentPosition > 0) currentPosition - 1 else songList.size - 1
+            currentPosition = (currentPosition + 1) % songList.size
         }
-
         playSong()
     }
 
+    private fun prevSong() {
+        if (songList.isEmpty()) return
+        currentPosition = if (currentPosition > 0) currentPosition - 1 else songList.size - 1
+        playSong()
+    }
+
+    private fun updatePlaybackState(state: Int) {
+        val stateBuilder = PlaybackStateCompat.Builder()
+            .setActions(
+                PlaybackStateCompat.ACTION_PLAY or
+                        PlaybackStateCompat.ACTION_PAUSE or
+                        PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+            )
+            .setState(state, mediaPlayer?.currentPosition?.toLong() ?: 0L, 1.0f)
+        mediaSession.setPlaybackState(stateBuilder.build())
+    }
+
     private fun updateSeekBar() {
+        handler.removeCallbacksAndMessages(null) // Limpiar handlers previos
         runnable = Runnable {
             mediaPlayer?.let {
-                seekBar.progress = it.currentPosition
-                handler.postDelayed(runnable, 500)
+                if (it.isPlaying) {
+                    seekBar.progress = it.currentPosition
+                    handler.postDelayed(runnable, 500)
+                }
             }
         }
         handler.post(runnable)
@@ -174,7 +190,9 @@ class PlayerActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        handler.removeCallbacks(runnable)
+        mediaSession.release()
+        handler.removeCallbacksAndMessages(null)
         mediaPlayer?.release()
+        mediaPlayer = null
     }
 }
