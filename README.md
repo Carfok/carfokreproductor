@@ -30,11 +30,5 @@
    - Copia tus archivos de audio allí.
 4. **Permisos**: Al iniciar, la app solicitará permiso para leer archivos y enviar notificaciones (en Android 13+).
 
-## 📸 Capturas de Pantalla
-
-| Lista de Canciones | Reproductor | Notificación |
-| :---: | :---: | :---: |
-| ![Lista](https://via.placeholder.com/200x400?text=Lista+Dark) | ![Player](https://via.placeholder.com/200x400?text=Player+Controls) | ![Notificación](https://via.placeholder.com/200x100?text=Media+Style) |
-
 ---
 Desarrollado por **Carfok**
