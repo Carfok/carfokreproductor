@@ -30,6 +30,10 @@ class MusicService : Service() {
     private var currentPosition: Int = 0
     private var folderPath: String? = null
 
+    // Modos de reproducción
+    var isShuffle: Boolean = false
+    var isRepeat: Boolean = false
+
     private lateinit var mediaSession: MediaSessionCompat
     private val CHANNEL_ID = "carfok_music_channel"
     private val NOTIFICATION_ID = 1
@@ -96,7 +100,10 @@ class MusicService : Service() {
         // Evitar reiniciar si es la misma canción sonando
         if (currentSongPath == path && mediaPlayer?.isPlaying == true) return
 
-        stopMusic()
+        // No llamamos a stopMusic() para no quitar el foreground service
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        
         currentSongPath = path
         mediaPlayer = MediaPlayer().apply {
             setDataSource(path)
@@ -113,7 +120,17 @@ class MusicService : Service() {
     @RequiresApi(Build.VERSION_CODES.Q)
     fun playNext() {
         if (songList.isEmpty() || folderPath == null) return
-        currentPosition = (currentPosition + 1) % songList.size
+
+        if (isRepeat) {
+            // Si está en modo repetición, reiniciamos la misma canción
+        } else if (isShuffle) {
+            // Si está en aleatorio, elegimos una posición al azar
+            currentPosition = (0 until songList.size).random()
+        } else {
+            // Modo normal: siguiente canción
+            currentPosition = (currentPosition + 1) % songList.size
+        }
+
         val nextPath = File(folderPath, songList[currentPosition]).absolutePath
         startMusic(nextPath)
     }
@@ -121,7 +138,14 @@ class MusicService : Service() {
     @RequiresApi(Build.VERSION_CODES.Q)
     fun playPrevious() {
         if (songList.isEmpty() || folderPath == null) return
-        currentPosition = if (currentPosition > 0) currentPosition - 1 else songList.size - 1
+        
+        // En "Anterior" solemos ignorar repeat para permitir volver atrás
+        if (isShuffle) {
+            currentPosition = (0 until songList.size).random()
+        } else {
+            currentPosition = if (currentPosition > 0) currentPosition - 1 else songList.size - 1
+        }
+        
         val prevPath = File(folderPath, songList[currentPosition]).absolutePath
         startMusic(prevPath)
     }

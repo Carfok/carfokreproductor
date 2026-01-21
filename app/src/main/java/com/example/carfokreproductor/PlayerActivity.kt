@@ -32,8 +32,6 @@ class PlayerActivity : AppCompatActivity() {
     private var songList: ArrayList<String> = arrayListOf()
     private var folderPath: String? = null
     private var currentPosition: Int = 0
-    private var isRepeat: Boolean = false
-    private var isShuffle: Boolean = false
 
     // Hilo para actualizar la barra de progreso
     private val handler = Handler(Looper.getMainLooper())
@@ -98,14 +96,17 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         btnRepeat.setOnClickListener {
-            isRepeat = !isRepeat
-            btnRepeat.setColorFilter(if (isRepeat) Color.CYAN else Color.WHITE)
+            musicService?.let {
+                it.isRepeat = !it.isRepeat
+                btnRepeat.setColorFilter(if (it.isRepeat) Color.CYAN else Color.WHITE)
+            }
         }
 
         btnShuffle.setOnClickListener {
-            isShuffle = !isShuffle
-            btnShuffle.setColorFilter(if (isShuffle) Color.CYAN else Color.WHITE)
-            // Nota: Podrías añadir lógica de shuffle en el MusicService también
+            musicService?.let {
+                it.isShuffle = !it.isShuffle
+                btnShuffle.setColorFilter(if (it.isShuffle) Color.CYAN else Color.WHITE)
+            }
         }
 
         // 4. Configurar SeekBar
@@ -141,6 +142,10 @@ class PlayerActivity : AppCompatActivity() {
             musicService?.let {
                 tvTitle.text = it.currentSongTitle
                 updatePlayPauseIcon()
+                
+                // Actualizar colores de botones según el estado del servicio
+                findViewById<ImageButton>(R.id.btnRepeat).setColorFilter(if (it.isRepeat) Color.CYAN else Color.WHITE)
+                findViewById<ImageButton>(R.id.btnShuffle).setColorFilter(if (it.isShuffle) Color.CYAN else Color.WHITE)
             }
         }, 200)
     }
@@ -164,6 +169,9 @@ class PlayerActivity : AppCompatActivity() {
                 // Si el título en pantalla es distinto al que suena (porque cambió en la notificación)
                 if (tvTitle.text != service.currentSongTitle) {
                     tvTitle.text = service.currentSongTitle
+                    // También asegurar que los botones reflejen el estado (por si cambiaron fuera de la Activity)
+                    findViewById<ImageButton>(R.id.btnRepeat).setColorFilter(if (service.isRepeat) Color.CYAN else Color.WHITE)
+                    findViewById<ImageButton>(R.id.btnShuffle).setColorFilter(if (service.isShuffle) Color.CYAN else Color.WHITE)
                 }
             }
             handler.postDelayed(runnable, 500)
