@@ -1,19 +1,34 @@
-# Carfok Reproductor 🎵
+# 🎵 Carfok Music Player
 
-Un reproductor de música sencillo, elegante y funcional para Android, diseñado para leer archivos de audio directamente desde el almacenamiento público del dispositivo.
+**Carfok Music Player** es un reproductor de audio ligero y potente para Android, diseñado para ofrecer una experiencia fluida con una interfaz oscura y moderna. Permite gestionar bibliotecas de música locales de forma eficiente y con control total desde dispositivos externos.
 
-## ✨ Características
+## ✨ Características Principales
 
-- **Soporte Multiformato:** Reproduce archivos `.mp3`, `.wav`, `.aac`, `.ogg`, `.m4a` y `.flac`.
-- **Gestión de Archivos Pública:** Lee las canciones desde la carpeta `Music/CarfokMusic`, facilitando al usuario la gestión de su biblioteca sin cables ni carpetas ocultas.
-- **Modos de Reproducción:**
-  - **Shuffle (Aleatorio):** Algoritmo inteligente que evita la repetición de la misma canción.
-  - **Repeat (Bucle):** Opción para repetir tu canción favorita infinitamente.
-- **Interfaz Moderna:** Diseño oscuro (Dark Mode) con iconos intuitivos y animaciones suaves en los controles.
-- **Control Inteligente:** Botón único de Play/Pause que cambia dinámicamente según el estado del audio.
+* **📂 Gestión de Almacenamiento Público:** Escanea automáticamente la carpeta `/Music/CarfokMusic` en la memoria interna, facilitando al usuario la adición de archivos.
+* **🎶 Compatibilidad Multiformato:** Soporta `MP3`, `WAV`, `AAC`, `OGG`, `M4A` y `FLAC`.
+* **📱 Interfaz Moderna (Dark Mode):** Diseño optimizado para alto contraste con texto blanco y fondos profundos para una mejor visualización.
+* **🔍 Buscador Inteligente:** Filtrado de canciones en tiempo real mediante un `SearchView` optimizado con `DiffUtil`.
+* **🎧 Control Remoto (Bluetooth):** Integración completa con `MediaSession` para controlar la música desde cascos Bluetooth, relojes inteligentes o mandos externos.
+* **🔔 Notificación Multimedia:** Controles de reproducción integrados en la barra de notificaciones con estilo `MediaStyle`.
+* **🔀 Modos de Reproducción:** Funciones de **Bucle (Repeat)** y **Aleatorio (Shuffle)** inteligente (evita repetir la misma canción).
+
+## 🛠️ Tecnologías Utilizadas
+
+* **Kotlin**: Lenguaje principal de desarrollo.
+* **Android Jetpack**: Componentes de arquitectura y UI.
+* **MediaPlayer API**: Motor de reproducción de audio nativo.
+* **MediaSessionCompat**: Control de eventos multimedia y hardware externo.
+* **RecyclerView & DiffUtil**: Para una gestión de listas fluida y eficiente.
+* **Version Catalogs (libs.toml)**: Gestión de dependencias moderna.
 
 ## 🚀 Instalación y Uso
 
-1. **Clonar el repositorio:**
-   ```bash
-   git clone [https://github.com/tu-usuario/CarfokReproductor.git](https://github.com/tu-usuario/CarfokReproductor.git)
+1. **Clonar el repositorio** o descargar el código.
+2. **Abrir con Android Studio** (Ladybug o superior recomendado).
+3. **Cargar música**:
+   - Crea una carpeta llamada `CarfokMusic` dentro de la carpeta `Music` de tu dispositivo.
+   - Copia tus archivos de audio allí.
+4. **Permisos**: Al iniciar, la app solicitará permiso para leer archivos y enviar notificaciones (en Android 13+).
+
+---
+Desarrollado por **Carfok**
