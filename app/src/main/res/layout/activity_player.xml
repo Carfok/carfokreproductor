@@ -2,24 +2,40 @@
 <androidx.constraintlayout.widget.ConstraintLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/fondo_reproductor"
+    android:background="@drawable/bg_player_gradient"
     android:fitsSystemWindows="true"
     android:padding="24dp">
 
-    <androidx.cardview.widget.CardView
-        android:id="@+id/cardAlbum"
-        android:layout_width="0dp"
-        android:layout_height="0dp"
-        app:cardCornerRadius="20dp"
-        app:cardElevation="12dp"
-        app:layout_constraintDimensionRatio="1:1"
+    <TextView
+        android:id="@+id/tvNowPlaying"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="REPRODUCIENDO"
+        android:textColor="#B3FFFFFF"
+        android:textSize="12sp"
+        android:letterSpacing="0.2"
+        android:textStyle="bold"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:layout_marginTop="8dp"/>
+
+    <com.google.android.material.card.MaterialCardView
+        android:id="@+id/cardAlbum"
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:cardCornerRadius="32dp"
+        app:cardElevation="24dp"
+        app:strokeWidth="0dp"
+        app:layout_constraintDimensionRatio="1:1"
+        app:layout_constraintTop_toBottomOf="@id/tvNowPlaying"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
         android:layout_marginTop="32dp"
-        android:layout_marginHorizontal="24dp">
+        android:layout_marginHorizontal="16dp">
 
         <ImageView
             android:id="@+id/ivAlbumArt"
@@ -27,8 +43,8 @@
             android:layout_height="match_parent"
             android:scaleType="centerCrop"
             android:src="@android:drawable/ic_lock_silent_mode_off"
-            android:background="#333333" />
-    </androidx.cardview.widget.CardView>
+            android:background="#222222" />
+    </com.google.android.material.card.MaterialCardView>
 
     <TextView
         android:id="@+id/tvPlayerTitle"
@@ -37,9 +53,11 @@
         android:layout_marginTop="40dp"
         android:gravity="center"
         android:text="Nombre de la Canción"
-        android:textColor="@color/blanco_puro"
-        android:textSize="22sp"
+        android:textColor="@color/white"
+        android:textSize="26sp"
         android:textStyle="bold"
+        android:ellipsize="marquee"
+        android:singleLine="true"
         app:layout_constraintTop_toBottomOf="@id/cardAlbum"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -48,9 +66,10 @@
         android:id="@+id/tvPlayerArtist"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
         android:text="Carfok Music"
-        android:textColor="#CCCCCC"
-        android:textSize="16sp"
+        android:textColor="#CCFFFFFF"
+        android:textSize="18sp"
         app:layout_constraintTop_toBottomOf="@id/tvPlayerTitle"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
@@ -60,32 +79,57 @@
         android:layout_width="0dp"
         android:layout_height="wrap_content"
         android:layout_marginTop="48dp"
-        android:progressTint="@color/blanco_puro"
-        android:thumbTint="@color/blanco_puro"
+        android:progressTint="@color/white"
+        android:thumbTint="@color/white"
+        android:splitTrack="false"
         app:layout_constraintTop_toBottomOf="@id/tvPlayerArtist"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
-    <ImageButton
+    <TextView
+        android:id="@+id/tvCurrentTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="0:00"
+        android:textColor="#88FFFFFF"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/playerSeekBar"
+        app:layout_constraintStart_toStartOf="@id/playerSeekBar"
+        android:layout_marginStart="12dp" />
+
+    <TextView
+        android:id="@+id/tvTotalTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="4:30"
+        android:textColor="#88FFFFFF"
+        android:textSize="12sp"
+        app:layout_constraintTop_toBottomOf="@id/playerSeekBar"
+        app:layout_constraintEnd_toEndOf="@id/playerSeekBar"
+        android:layout_marginEnd="12dp" />
+
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
         android:id="@+id/btnPlayPause"
-        android:layout_width="80dp"
-        android:layout_height="80dp"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginTop="32dp"
-        android:background="?attr/selectableItemBackgroundBorderless"
-        android:scaleType="fitCenter"
         android:src="@drawable/pause_circle_24px"
-        app:tint="@color/blanco_puro"
+        app:fabCustomSize="84dp"
+        app:maxImageSize="48dp"
+        app:tint="@color/md_theme_dark_primaryContainer"
+        app:backgroundTint="@color/white"
         app:layout_constraintTop_toBottomOf="@id/playerSeekBar"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent" />
 
     <ImageButton
         android:id="@+id/btnPrev"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/skip_previous_24px"
-        app:tint="@color/blanco_puro"
+        app:tint="@color/white"
+        android:scaleType="fitCenter"
         app:layout_constraintTop_toTopOf="@id/btnPlayPause"
         app:layout_constraintBottom_toBottomOf="@id/btnPlayPause"
         app:layout_constraintEnd_toStartOf="@id/btnPlayPause"
@@ -93,11 +137,12 @@
 
     <ImageButton
         android:id="@+id/btnNext"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/skip_next_24px"
-        app:tint="@color/blanco_puro"
+        app:tint="@color/white"
+        android:scaleType="fitCenter"
         app:layout_constraintTop_toTopOf="@id/btnPlayPause"
         app:layout_constraintBottom_toBottomOf="@id/btnPlayPause"
         app:layout_constraintStart_toEndOf="@id/btnPlayPause"
@@ -110,10 +155,9 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/shuffle_on_24px"
         app:tint="#88FFFFFF"
-        app:layout_constraintTop_toBottomOf="@id/btnPlayPause"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintEnd_toStartOf="@id/btnRepeat"
-        android:layout_marginTop="24dp" />
+        android:layout_marginBottom="24dp" />
 
     <ImageButton
         android:id="@+id/btnRepeat"
@@ -122,9 +166,8 @@
         android:background="?attr/selectableItemBackgroundBorderless"
         android:src="@drawable/repeat_one_24px"
         app:tint="#88FFFFFF"
-        app:layout_constraintTop_toBottomOf="@id/btnPlayPause"
-        app:layout_constraintStart_toEndOf="@id/btnShuffle"
+        app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
-        android:layout_marginTop="24dp" />
+        android:layout_marginBottom="24dp" />
 
 </androidx.constraintlayout.widget.ConstraintLayout>

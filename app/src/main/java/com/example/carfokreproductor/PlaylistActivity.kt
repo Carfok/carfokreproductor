@@ -1,5 +1,6 @@
 package com.example.carfokreproductor
 
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -41,28 +42,23 @@ class PlaylistActivity : AppCompatActivity() {
 
         adapter = PlaylistAdapter(
             playlistNames,
-            onItemClick = { playlistName ->
-                // TODO: AQUÍ ABRIREMOS LA PANTALLA DE CANCIONES DE LA LISTA
-                // Por ahora mostramos un mensaje hasta que creemos esa actividad
-                Toast.makeText(this, "Abriendo $playlistName...", Toast.LENGTH_SHORT).show()
-
+            onItemClick = { playlistName: String ->
                 val intent = Intent(this, PlaylistSongsActivity::class.java)
                 intent.putExtra("PLAYLIST_NAME", playlistName)
                 startActivity(intent)
             },
-            onDeleteClick = { playlistName ->
+            onDeleteClick = { playlistName: String ->
                 showDeleteDialog(playlistName)
             }
         )
         rvPlaylists.adapter = adapter
     }
 
-    // Diálogo de confirmación para borrar
     private fun showDeleteDialog(name: String) {
         AlertDialog.Builder(this)
             .setTitle("Eliminar lista")
             .setMessage("¿Seguro que quieres borrar la lista '$name'?")
-            .setPositiveButton("Eliminar") { _, _ ->
+            .setPositiveButton("Eliminar") { _: DialogInterface, _: Int ->
                 playlistManager.deletePlaylist(name)
                 refreshList()
                 Toast.makeText(this, "Lista eliminada", Toast.LENGTH_SHORT).show()
@@ -88,7 +84,6 @@ class PlaylistActivity : AppCompatActivity() {
         }
     }
 
-    // --- ADAPTER INTERNO ---
     class PlaylistAdapter(
         private val playlists: List<String>,
         private val onItemClick: (String) -> Unit,

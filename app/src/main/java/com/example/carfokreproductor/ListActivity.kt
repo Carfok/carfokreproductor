@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
 import android.content.pm.PackageManager
+import android.graphics.BitmapFactory
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -17,6 +19,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.annotation.RequiresApi
@@ -46,12 +49,11 @@ class ListActivity : AppCompatActivity() {
     private lateinit var miniPlayerLayout: CardView
     private lateinit var tvMiniTitle: TextView
     private lateinit var btnMiniPlayPause: ImageButton
+    private lateinit var ivMiniIcon: ImageView
 
-    // Handler para actualizar la UI del mini player
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateTask: Runnable
 
-    // Conexión con el servicio
     private val connection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as MusicService.MusicBinder
@@ -79,11 +81,11 @@ class ListActivity : AppCompatActivity() {
         val fabPlaylists = findViewById<FloatingActionButton>(R.id.fabPlaylists)
         val btnViewPlaylists = findViewById<ImageButton>(R.id.btnViewPlaylists)
 
-        // Referencias Mini Player
         miniPlayerLayout = findViewById(R.id.layoutMiniPlayer)
         tvMiniTitle = findViewById(R.id.tvMiniTitle)
         tvMiniTitle.isSelected = true
         btnMiniPlayPause = findViewById(R.id.btnMiniPlayPause)
+        ivMiniIcon = findViewById(R.id.ivMiniIcon)
 
         recyclerView.layoutManager = LinearLayoutManager(this)
 
@@ -94,6 +96,7 @@ class ListActivity : AppCompatActivity() {
 
         adapter = SongAdapter(
             ArrayList(songNamesFull),
+            musicFolder.absolutePath,
             onItemClick = { songName -> playSong(songName) },
             onOptionClick = { songName -> showAddToPlaylistDialog(songName) }
         )
@@ -115,16 +118,11 @@ class ListActivity : AppCompatActivity() {
             showCreatePlaylistDialog()
         }
 
-        // --- LÓGICA MINI PLAYER ---
-
-        // Clic en el Mini Player -> Abre PlayerActivity (para ver la carátula grande, barra, etc)
         miniPlayerLayout.setOnClickListener {
             val intent = Intent(this, PlayerActivity::class.java)
-            // No pasamos lista nueva, PlayerActivity detectará que el servicio ya tiene una
             startActivity(intent)
         }
 
-        // Clic en Play/Pause del Mini Player
         btnMiniPlayPause.setOnClickListener {
             musicService?.playPause()
             updateMiniPlayerUI()
@@ -133,36 +131,37 @@ class ListActivity : AppCompatActivity() {
 
     override fun onStart() {
         super.onStart()
-        // Conectar al servicio para ver si hay música sonando
         val intent = Intent(this, MusicService::class.java)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        bindService(intent, connection, BIND_AUTO_CREATE)
     }
 
     override fun onStop() {
         super.onStop()
-        // Dejar de actualizar UI cuando la app no se ve
-        handler.removeCallbacks(updateTask)
+        if (::updateTask.isInitialized) handler.removeCallbacks(updateTask)
         if (isBound) {
             unbindService(connection)
             isBound = false
         }
     }
 
-    // Tarea repetitiva para detectar cambios de canción (ej. si se acaba y pasa a la siguiente)
     private fun startMiniPlayerUpdater() {
         updateTask = Runnable {
             updateMiniPlayerUI()
-            handler.postDelayed(updateTask, 1000) // Revisar cada segundo
+            handler.postDelayed(updateTask, 1000)
         }
         handler.post(updateTask)
     }
 
     private fun updateMiniPlayerUI() {
         musicService?.let { service ->
-            // Solo mostramos el mini player si hay una canción cargada (ruta no nula)
             if (service.currentSongPath != null) {
                 miniPlayerLayout.visibility = View.VISIBLE
                 tvMiniTitle.text = service.currentSongTitle
+
+                // Cargar imagen en mini player
+                val art = getAlbumArt(service.currentSongPath!!)
+                if (art != null) ivMiniIcon.setImageBitmap(art)
+                else ivMiniIcon.setImageResource(R.drawable.play_circle_24px)
 
                 val isPlaying = service.isPlaying()
                 btnMiniPlayPause.setImageResource(
@@ -174,8 +173,14 @@ class ListActivity : AppCompatActivity() {
         }
     }
 
-    // ... (El resto de funciones: loadSongs, playSong, Dialogs, filter, Permissions, Adapter...)
-    // ... (Copia aquí el resto de tus funciones existentes sin cambios) ...
+    private fun getAlbumArt(path: String): android.graphics.Bitmap? {
+        val retriever = MediaMetadataRetriever()
+        return try {
+            retriever.setDataSource(path)
+            val art = retriever.embeddedPicture
+            if (art != null) BitmapFactory.decodeByteArray(art, 0, art.size) else null
+        } catch (e: Exception) { null } finally { retriever.release() }
+    }
 
     private fun loadSongs() {
         val extensionesAceptadas = listOf("mp3", "wav", "aac", "ogg", "m4a", "flac")
@@ -256,6 +261,7 @@ class ListActivity : AppCompatActivity() {
 
     class SongAdapter(
         private var songs: ArrayList<String>,
+        private val folderPath: String,
         private val onItemClick: (String) -> Unit,
         private val onOptionClick: (String) -> Unit
     ) : RecyclerView.Adapter<SongAdapter.ViewHolder>() {
@@ -263,6 +269,7 @@ class ListActivity : AppCompatActivity() {
         class ViewHolder(view: View) : RecyclerView.ViewHolder(view) {
             val tvTitle: TextView = view.findViewById(R.id.tvSongTitle)
             val btnOptions: ImageButton = view.findViewById(R.id.btnSongOptions)
+            val ivIcon: ImageView = view.findViewById(R.id.ivMusicIcon)
         }
 
         fun updateList(newList: List<String>) {
@@ -286,8 +293,24 @@ class ListActivity : AppCompatActivity() {
         override fun onBindViewHolder(holder: ViewHolder, position: Int) {
             val songName = songs[position]
             holder.tvTitle.text = songName
+            
+            // Cargar imagen real de la canción
+            val fullPath = File(folderPath, songName).absolutePath
+            val art = getAlbumArt(fullPath)
+            if (art != null) holder.ivIcon.setImageBitmap(art)
+            else holder.ivIcon.setImageResource(R.drawable.play_circle_24px)
+
             holder.itemView.setOnClickListener { onItemClick(songName) }
             holder.btnOptions.setOnClickListener { onOptionClick(songName) }
+        }
+
+        private fun getAlbumArt(path: String): android.graphics.Bitmap? {
+            val retriever = MediaMetadataRetriever()
+            return try {
+                retriever.setDataSource(path)
+                val art = retriever.embeddedPicture
+                if (art != null) BitmapFactory.decodeByteArray(art, 0, art.size) else null
+            } catch (e: Exception) { null } finally { retriever.release() }
         }
 
         override fun getItemCount() = songs.size

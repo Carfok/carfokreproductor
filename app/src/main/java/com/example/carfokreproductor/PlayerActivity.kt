@@ -4,13 +4,16 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
 import androidx.annotation.RequiresApi
@@ -27,6 +30,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var seekBar: SeekBar
     private lateinit var tvTitle: TextView
     private lateinit var btnPlayPause: ImageButton
+    private lateinit var ivAlbumArt: ImageView
 
     // Variables de Lógica
     private var songList: ArrayList<String> = arrayListOf()
@@ -76,6 +80,7 @@ class PlayerActivity : AppCompatActivity() {
         tvTitle = findViewById(R.id.tvPlayerTitle)
         btnPlayPause = findViewById(R.id.btnPlayPause)
         seekBar = findViewById(R.id.playerSeekBar)
+        ivAlbumArt = findViewById(R.id.ivAlbumArt)
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
         val btnPrev = findViewById<ImageButton>(R.id.btnPrev)
         val btnRepeat = findViewById<ImageButton>(R.id.btnRepeat)
@@ -105,7 +110,6 @@ class PlayerActivity : AppCompatActivity() {
         btnShuffle.setOnClickListener {
             isShuffle = !isShuffle
             btnShuffle.setColorFilter(if (isShuffle) Color.CYAN else Color.WHITE)
-            // Nota: Podrías añadir lógica de shuffle en el MusicService también
         }
 
         // 4. Configurar SeekBar
@@ -120,7 +124,7 @@ class PlayerActivity : AppCompatActivity() {
         // 5. Iniciar y conectar el Servicio
         val intent = Intent(this, MusicService::class.java)
         startService(intent)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        bindService(intent, connection, BIND_AUTO_CREATE)
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -131,7 +135,27 @@ class PlayerActivity : AppCompatActivity() {
 
             tvTitle.text = songName
             musicService?.startMusic(fullPath)
+            updateAlbumArt(fullPath)
             updatePlayPauseIcon()
+        }
+    }
+
+    private fun updateAlbumArt(path: String?) {
+        if (path == null) return
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(path)
+            val art = retriever.embeddedPicture
+            if (art != null) {
+                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                ivAlbumArt.setImageBitmap(bitmap)
+            } else {
+                ivAlbumArt.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
+            }
+        } catch (e: Exception) {
+            ivAlbumArt.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
+        } finally {
+            retriever.release()
         }
     }
 
@@ -140,6 +164,7 @@ class PlayerActivity : AppCompatActivity() {
         handler.postDelayed({
             musicService?.let {
                 tvTitle.text = it.currentSongTitle
+                updateAlbumArt(it.currentSongPath)
                 updatePlayPauseIcon()
             }
         }, 200)
@@ -164,6 +189,7 @@ class PlayerActivity : AppCompatActivity() {
                 // Si el título en pantalla es distinto al que suena (porque cambió en la notificación)
                 if (tvTitle.text != service.currentSongTitle) {
                     tvTitle.text = service.currentSongTitle
+                    updateAlbumArt(service.currentSongPath)
                 }
             }
             handler.postDelayed(runnable, 500)

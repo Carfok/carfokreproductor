@@ -1,5 +1,6 @@
 package com.example.carfokreproductor
 
+import android.content.DialogInterface
 import android.content.Intent
 import android.os.Bundle
 import android.os.Environment
@@ -15,7 +16,7 @@ import java.io.File
 class PlaylistSongsActivity : AppCompatActivity() {
 
     private lateinit var playlistManager: PlaylistManager
-    private lateinit var adapter: ListActivity.SongAdapter // Reutilizamos el adaptador de ListActivity
+    private lateinit var adapter: ListActivity.SongAdapter
     private var playlistName: String = ""
     private var songPaths: List<String> = listOf()
     private var songNames: ArrayList<String> = arrayListOf()
@@ -35,14 +36,16 @@ class PlaylistSongsActivity : AppCompatActivity() {
 
         loadSongs()
 
-        // Reutilizamos el SongAdapter que ya creamos en ListActivity
-        // Nota: Para los 3 puntos, aquí daremos opción de BORRAR de la lista
+        // Obtenemos la carpeta de música por defecto para el adaptador
+        val musicFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "CarfokMusic")
+
         adapter = ListActivity.SongAdapter(
             songNames,
-            onItemClick = { songName ->
+            musicFolder.absolutePath,
+            onItemClick = { songName: String ->
                 playSong(songName)
             },
-            onOptionClick = { songName ->
+            onOptionClick = { songName: String ->
                 showRemoveDialog(songName)
             }
         )
@@ -50,10 +53,7 @@ class PlaylistSongsActivity : AppCompatActivity() {
     }
 
     private fun loadSongs() {
-        // 1. Obtener las rutas completas guardadas en el JSON
         val savedPaths = playlistManager.getSongsInPlaylist(playlistName)
-
-        // 2. Filtrar solo las que existen físicamente (por si borraste el archivo mp3)
         val validFiles = savedPaths.map { File(it) }.filter { it.exists() }
 
         songPaths = validFiles.map { it.absolutePath }
@@ -67,12 +67,9 @@ class PlaylistSongsActivity : AppCompatActivity() {
         val position = songNames.indexOf(songName)
         if (position == -1) return
 
-        // Obtenemos la carpeta contenedora de la canción (asumimos que todas están en CarfokMusic
-        // o extraemos la ruta padre de la primera canción si queremos ser más exactos)
         val musicFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "CarfokMusic")
 
         val intent = Intent(this, PlayerActivity::class.java)
-        // TRUCO: Enviamos SOLO los nombres de esta playlist
         intent.putStringArrayListExtra("SONG_LIST", songNames)
         intent.putExtra("FOLDER_PATH", musicFolder.absolutePath)
         intent.putExtra("POSITION", position)
@@ -83,14 +80,11 @@ class PlaylistSongsActivity : AppCompatActivity() {
         AlertDialog.Builder(this)
             .setTitle("Quitar canción")
             .setMessage("¿Quitar '$songName' de la lista $playlistName?")
-            .setPositiveButton("Quitar") { _, _ ->
-                // Necesitamos la ruta completa para borrarla del manager
+            .setPositiveButton("Quitar") { _: DialogInterface, _: Int ->
                 val index = songNames.indexOf(songName)
                 if (index != -1) {
                     val fullPath = songPaths[index]
                     playlistManager.removeSongFromPlaylist(playlistName, fullPath)
-
-                    // Recargar la lista visualmente
                     loadSongs()
                     adapter.updateList(songNames)
                     Toast.makeText(this, "Eliminada de la lista", Toast.LENGTH_SHORT).show()
@@ -100,7 +94,6 @@ class PlaylistSongsActivity : AppCompatActivity() {
             .show()
     }
 
-    // Necesitamos asegurarnos de que la lista se refresque si volvemos atrás
     override fun onResume() {
         super.onResume()
         loadSongs()
