@@ -13,6 +13,9 @@ import android.os.Binder
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import android.telephony.PhoneStateListener
+import android.telephony.TelephonyManager
+import android.content.Context // Necesario para getSystemService en onCreate
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
@@ -38,6 +41,11 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener {
     var isShuffle = false
     var isRepeat = false
 
+    // --- MANEJO DE LLAMADAS ---
+    private var telephonyManager: TelephonyManager? = null
+    private var phoneStateListener: PhoneStateListener? = null
+    private var wasPlayingWhenCall = false
+
     companion object {
         const val CHANNEL_ID = "MusicChannel"
         const val NOTIFICATION_ID = 1
@@ -59,6 +67,35 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener {
             override fun onSkipToPrevious() { playPrevious() }
         })
         mediaSession.isActive = true
+
+        // Inicializar TelephonyManager y PhoneStateListener
+        telephonyManager = getSystemService(Context.TELEPHONY_SERVICE) as TelephonyManager
+        phoneStateListener = object : PhoneStateListener() {
+            @Deprecated("Deprecated in API level 31")
+            override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                super.onCallStateChanged(state, phoneNumber)
+                when (state) {
+                    TelephonyManager.CALL_STATE_RINGING, TelephonyManager.CALL_STATE_OFFHOOK -> {
+                        // Hay una llamada entrante o en curso
+                        if (mediaPlayer?.isPlaying == true) {
+                            wasPlayingWhenCall = true
+                            mediaPlayer?.pause()
+                            showNotification(false)
+                        }
+                    }
+                    TelephonyManager.CALL_STATE_IDLE -> {
+                        // La llamada ha terminado
+                        if (wasPlayingWhenCall) {
+                            mediaPlayer?.start()
+                            showNotification(true)
+                            wasPlayingWhenCall = false
+                        }
+                    }
+                }
+            }
+        }
+        // Registrar el listener (se requiere el permiso READ_PHONE_STATE)
+        telephonyManager?.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
     }
 
     // Recibimos la lista desde la Activity
@@ -242,6 +279,8 @@ class MusicService : Service(), MediaPlayer.OnCompletionListener {
         super.onDestroy()
         mediaPlayer?.release()
         mediaSession.release()
+        // Desregistrar el listener de llamadas
+        telephonyManager?.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
     }
 
     inner class MusicBinder : Binder() {

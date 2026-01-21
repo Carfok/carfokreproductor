@@ -7,7 +7,6 @@ import android.content.ServiceConnection
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.media.MediaMetadataRetriever
-import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
@@ -86,7 +85,7 @@ class PlayerActivity : AppCompatActivity() {
         // Iniciar Servicio
         val intent = Intent(this, MusicService::class.java)
         startService(intent)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+        bindService(intent, connection, BIND_AUTO_CREATE)
     }
 
     private fun initViews() {
