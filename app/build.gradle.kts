@@ -52,16 +52,17 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    implementation(libs.google.gson)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
-        // Dependencias básicas de Android
+    // Dependencias básicas de Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-        // --- ESTAS SON LAS QUE NECESITAS PARA EL REPRODUCTOR ---
+    // --- ESTAS SON LAS QUE NECESITAS PARA EL REPRODUCTOR ---
     implementation(libs.material)              // Para RecyclerView y Estilos
     implementation(libs.androidx.constraintlayout) // Para diseños flexibles
-        // -------------------------------------------------------
-        // Testing (ya suelen venir por defecto)
+    // -------------------------------------------------------
+    // Testing (ya suelen venir por defecto)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
