@@ -1,34 +1,47 @@
 # 🎵 Carfok Music Player
 
-**Carfok Music Player** es un reproductor de audio ligero y potente para Android, diseñado para ofrecer una experiencia fluida con una interfaz oscura y moderna. Permite gestionar bibliotecas de música locales de forma eficiente y con control total desde dispositivos externos.
+**Carfok Music Player** es un reproductor de audio avanzado y ligero para Android, diseñado bajo una arquitectura robusta de servicios para garantizar que la música nunca se detenga. Con una interfaz oscura minimalista y un sistema de gestión de listas inteligente, es la herramienta definitiva para tu biblioteca local.
 
 ## ✨ Características Principales
 
-* **📂 Gestión de Almacenamiento Público:** Escanea automáticamente la carpeta `/Music/CarfokMusic` en la memoria interna, facilitando al usuario la adición de archivos.
-* **🎶 Compatibilidad Multiformato:** Soporta `MP3`, `WAV`, `AAC`, `OGG`, `M4A` y `FLAC`.
-* **📱 Interfaz Moderna (Dark Mode):** Diseño optimizado para alto contraste con texto blanco y fondos profundos para una mejor visualización.
-* **🔍 Buscador Inteligente:** Filtrado de canciones en tiempo real mediante un `SearchView` optimizado con `DiffUtil`.
-* **🎧 Control Remoto (Bluetooth):** Integración completa con `MediaSession` para controlar la música desde cascos Bluetooth, relojes inteligentes o mandos externos.
-* **🔔 Notificación Multimedia:** Controles de reproducción integrados en la barra de notificaciones con estilo `MediaStyle`.
-* **🔀 Modos de Reproducción:** Funciones de **Bucle (Repeat)** y **Aleatorio (Shuffle)** inteligente (evita repetir la misma canción).
+* **📀 Extracción de Metadatos:** Visualización automática de la carátula del álbum (Album Art) extraída directamente de los archivos multimedia.
+* **📂 Gestión de Almacenamiento:** Escanea automáticamente la carpeta `/Music/CarfokMusic`, organizando tu biblioteca al instante.
+* **📝 Sistema de Playlists Personalizadas:** Crea, gestiona y reproduce listas de reproducción personalizadas que se guardan de forma persistente mediante GSON.
+* **🎼 Mini Reproductor Persistente:** Controla la música desde la pantalla principal sin interrumpir tu navegación por la biblioteca.
+* **🎧 Servicio en Primer Plano (Background Play):** Reproducción ininterrumpida gracias a un servicio vinculado que evita que Android cierre la app.
+* **🔍 Buscador con DiffUtil:** Filtrado de canciones ultra rápido y con animaciones fluidas en la lista principal.
+* **📱 Notificación Multimedia Avanzada:** Controles integrados con `MediaStyle`, vinculados a una `MediaSession` para compatibilidad con smartwatches y dispositivos Bluetooth.
+* **🔀 Modos Inteligentes:** Funciones de **Bucle (Repeat One)** y **Aleatorio (Shuffle)**.
 
 ## 🛠️ Tecnologías Utilizadas
 
-* **Kotlin**: Lenguaje principal de desarrollo.
-* **Android Jetpack**: Componentes de arquitectura y UI.
-* **MediaPlayer API**: Motor de reproducción de audio nativo.
-* **MediaSessionCompat**: Control de eventos multimedia y hardware externo.
-* **RecyclerView & DiffUtil**: Para una gestión de listas fluida y eficiente.
-* **Version Catalogs (libs.toml)**: Gestión de dependencias moderna.
+* **Kotlin**: Código limpio y tipado de última generación.
+* **Android MediaSession**: Gestión profesional de controles de transporte y hardware externo.
+* **GSON**: Persistencia de datos ligera para el gestor de Playlists.
+* **CardView & ConstraintLayout**: Interfaz de usuario moderna, adaptada a pantallas con notch y gestos (fitsSystemWindows).
+* **Version Catalogs (libs.toml)**: Gestión centralizada de dependencias.
+* **MediaPlayer API**: Motor de audio nativo de alto rendimiento.
 
-## 🚀 Instalación y Uso
 
-1. **Clonar el repositorio** o descargar el código.
-2. **Abrir con Android Studio** (Ladybug o superior recomendado).
-3. **Cargar música**:
-   - Crea una carpeta llamada `CarfokMusic` dentro de la carpeta `Music` de tu dispositivo.
-   - Copia tus archivos de audio allí.
-4. **Permisos**: Al iniciar, la app solicitará permiso para leer archivos y enviar notificaciones (en Android 13+).
+
+## 🚀 Instalación y Configuración
+
+1. **Requisitos**: Android Studio Ladybug (o superior) y un dispositivo con Android 10 (API 29) o superior.
+2. **Cargar música**:
+   - Crea la carpeta `Music/CarfokMusic` en tu memoria interna.
+   - Añade tus canciones en formatos soportados (`MP3`, `WAV`, `AAC`, `FLAC`, etc.).
+3. **Compilación**:
+   - Clona el repositorio.
+   - Sincroniza el proyecto con Gradle para descargar las dependencias (especialmente **GSON** y **AndroidX Media**).
+4. **Permisos**: Acepta los permisos de almacenamiento y notificaciones al iniciar para habilitar todas las funciones.
+
+## 📁 Estructura del Proyecto
+
+* `MusicService.kt`: El corazón del reproductor. Gestiona el audio y la notificación.
+* `PlaylistManager.kt`: Gestor de persistencia de listas de reproducción.
+* `PlayerActivity.kt`: Interfaz principal de reproducción con controles visuales.
+* `ListActivity.kt`: Biblioteca principal con buscador y mini-player.
+* `PlaylistActivity.kt`: Gestión de tus carpetas de listas personalizadas.
 
 ---
 Desarrollado por **Carfok**
