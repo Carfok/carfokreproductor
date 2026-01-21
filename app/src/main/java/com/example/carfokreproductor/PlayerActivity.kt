@@ -4,22 +4,23 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.BitmapFactory
 import android.graphics.Color
+import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
 import android.widget.ImageButton
+import android.widget.ImageView
 import android.widget.SeekBar
 import android.widget.TextView
-import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
 
 class PlayerActivity : AppCompatActivity() {
 
-    // Variables del Servicio
     private var musicService: MusicService? = null
     private var isBound = false
 
@@ -27,33 +28,40 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var seekBar: SeekBar
     private lateinit var tvTitle: TextView
     private lateinit var btnPlayPause: ImageButton
+    private lateinit var btnShuffle: ImageButton
+    private lateinit var btnRepeat: ImageButton
+    private lateinit var ivAlbumArt: ImageView
 
-    // Variables de Lógica
+    // Datos temporales (solo para el primer play)
     private var songList: ArrayList<String> = arrayListOf()
     private var folderPath: String? = null
     private var currentPosition: Int = 0
-    private var isRepeat: Boolean = false
-    private var isShuffle: Boolean = false
 
-    // Hilo para actualizar la barra de progreso
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var runnable: Runnable
 
-    // --- CONEXIÓN CON EL SERVICIO ---
     private val connection = object : ServiceConnection {
-        @RequiresApi(Build.VERSION_CODES.Q)
         override fun onServiceConnected(className: ComponentName, service: IBinder) {
             val binder = service as MusicService.MusicBinder
             musicService = binder.getService()
             isBound = true
 
-            // 1. IMPORTANTE: Pasamos la lista y la posición al servicio al conectar
-            folderPath?.let {
-                musicService?.setList(songList, it, currentPosition)
+            // 1. Configuramos la lista en el servicio SIEMPRE
+            if (folderPath != null && songList.isNotEmpty()) {
+                musicService?.setList(songList, folderPath!!, currentPosition)
+
+                // Solo iniciamos música si la canción solicitada es diferente a la que suena
+                // o si no está sonando nada.
+                val songName = songList[currentPosition]
+                val fullPath = File(folderPath, songName).absolutePath
+
+                if (musicService?.currentSongPath != fullPath) {
+                    musicService?.startMusic(fullPath)
+                }
             }
 
-            // 2. Iniciamos la música
-            playSongFromIntent()
+            // 2. Actualizamos la UI inicial (Shuffle/Repeat/Iconos)
+            updateUIState()
             startSeekBarUpdater()
         }
 
@@ -62,26 +70,35 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        // Ocultar ActionBar si no lo has hecho en themes
+        supportActionBar?.hide()
         setContentView(R.layout.activity_player)
 
-        // 1. Recibir datos de la lista
+        // Recibir datos del Intent
         songList = intent.getStringArrayListExtra("SONG_LIST") ?: arrayListOf()
         folderPath = intent.getStringExtra("FOLDER_PATH")
         currentPosition = intent.getIntExtra("POSITION", 0)
 
-        // 2. Inicializar Vistas
+        initViews()
+
+        // Iniciar Servicio
+        val intent = Intent(this, MusicService::class.java)
+        startService(intent)
+        bindService(intent, connection, Context.BIND_AUTO_CREATE)
+    }
+
+    private fun initViews() {
         tvTitle = findViewById(R.id.tvPlayerTitle)
         btnPlayPause = findViewById(R.id.btnPlayPause)
         seekBar = findViewById(R.id.playerSeekBar)
+        btnShuffle = findViewById(R.id.btnShuffle)
+        btnRepeat = findViewById(R.id.btnRepeat)
+        ivAlbumArt = findViewById(R.id.ivAlbumArt) // Asegúrate de tener este ID en el XML nuevo
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
         val btnPrev = findViewById<ImageButton>(R.id.btnPrev)
-        val btnRepeat = findViewById<ImageButton>(R.id.btnRepeat)
-        val btnShuffle = findViewById<ImageButton>(R.id.btnShuffle)
 
-        // 3. Configurar Botones (Ahora usan la lógica del servicio)
         btnPlayPause.setOnClickListener {
             musicService?.playPause()
             updatePlayPauseIcon()
@@ -89,26 +106,29 @@ class PlayerActivity : AppCompatActivity() {
 
         btnNext.setOnClickListener {
             musicService?.playNext()
-            updateUIFromService()
+            updateUIState() // Actualiza título e imagen inmediatamente
         }
 
         btnPrev.setOnClickListener {
             musicService?.playPrevious()
-            updateUIFromService()
+            updateUIState()
+        }
+
+        // --- LÓGICA CORREGIDA: Delegar al servicio ---
+        btnShuffle.setOnClickListener {
+            musicService?.let { service ->
+                service.isShuffle = !service.isShuffle
+                updateShuffleButton()
+            }
         }
 
         btnRepeat.setOnClickListener {
-            isRepeat = !isRepeat
-            btnRepeat.setColorFilter(if (isRepeat) Color.CYAN else Color.WHITE)
+            musicService?.let { service ->
+                service.isRepeat = !service.isRepeat
+                updateRepeatButton()
+            }
         }
 
-        btnShuffle.setOnClickListener {
-            isShuffle = !isShuffle
-            btnShuffle.setColorFilter(if (isShuffle) Color.CYAN else Color.WHITE)
-            // Nota: Podrías añadir lógica de shuffle en el MusicService también
-        }
-
-        // 4. Configurar SeekBar
         seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(s: SeekBar?, p: Int, fromUser: Boolean) {
                 if (fromUser) musicService?.seekTo(p)
@@ -116,55 +136,68 @@ class PlayerActivity : AppCompatActivity() {
             override fun onStartTrackingTouch(p0: SeekBar?) {}
             override fun onStopTrackingTouch(p0: SeekBar?) {}
         })
-
-        // 5. Iniciar y conectar el Servicio
-        val intent = Intent(this, MusicService::class.java)
-        startService(intent)
-        bindService(intent, connection, Context.BIND_AUTO_CREATE)
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun playSongFromIntent() {
-        if (folderPath != null && songList.isNotEmpty()) {
-            val songName = songList[currentPosition]
-            val fullPath = File(folderPath, songName).absolutePath
-
-            tvTitle.text = songName
-            musicService?.startMusic(fullPath)
+    // Actualiza TODO lo visual basándose en el estado real del Servicio
+    private fun updateUIState() {
+        musicService?.let { service ->
+            tvTitle.text = service.currentSongTitle
+            updateAlbumArt(service.currentSongPath)
             updatePlayPauseIcon()
+            updateShuffleButton()
+            updateRepeatButton()
         }
     }
 
-    // Nueva función para actualizar la pantalla cuando el servicio cambia de canción solo
-    private fun updateUIFromService() {
-        handler.postDelayed({
-            musicService?.let {
-                tvTitle.text = it.currentSongTitle
-                updatePlayPauseIcon()
-            }
-        }, 200)
+    private fun updateShuffleButton() {
+        val isShuffle = musicService?.isShuffle ?: false
+        btnShuffle.setColorFilter(if (isShuffle) Color.CYAN else Color.WHITE)
+        btnShuffle.alpha = if (isShuffle) 1.0f else 0.7f
+    }
+
+    private fun updateRepeatButton() {
+        val isRepeat = musicService?.isRepeat ?: false
+        btnRepeat.setColorFilter(if (isRepeat) Color.CYAN else Color.WHITE)
+        btnRepeat.alpha = if (isRepeat) 1.0f else 0.7f
     }
 
     private fun updatePlayPauseIcon() {
-        handler.postDelayed({
-            val isPlaying = musicService?.isPlaying() ?: false
-            btnPlayPause.setImageResource(
-                if (isPlaying) R.drawable.pause_circle_24px else R.drawable.play_circle_24px
-            )
-        }, 100)
+        val isPlaying = musicService?.isPlaying() ?: false
+        btnPlayPause.setImageResource(if (isPlaying) R.drawable.pause_circle_24px else R.drawable.play_circle_24px)
     }
 
-    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun updateAlbumArt(path: String?) {
+        if (path == null) return
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(path)
+            val art = retriever.embeddedPicture
+            if (art != null) {
+                val bitmap = BitmapFactory.decodeByteArray(art, 0, art.size)
+                ivAlbumArt.setImageBitmap(bitmap)
+            } else {
+                ivAlbumArt.setImageResource(android.R.drawable.ic_lock_silent_mode_off) // Tu icono por defecto
+            }
+        } catch (e: Exception) {
+            ivAlbumArt.setImageResource(android.R.drawable.ic_lock_silent_mode_off)
+        } finally {
+            retriever.release()
+        }
+    }
+
     private fun startSeekBarUpdater() {
         runnable = Runnable {
             musicService?.let { service ->
                 seekBar.max = service.getDuration()
                 seekBar.progress = service.getCurrentPosition()
 
-                // Si el título en pantalla es distinto al que suena (porque cambió en la notificación)
+                // Sincronización automática: Si la canción cambió sola (por onCompletion), actualizamos la UI
                 if (tvTitle.text != service.currentSongTitle) {
-                    tvTitle.text = service.currentSongTitle
+                    updateUIState()
                 }
+
+                // Actualizar icono play/pause por si cambió desde la notificación
+                updatePlayPauseIcon()
             }
             handler.postDelayed(runnable, 500)
         }
@@ -174,9 +207,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         handler.removeCallbacks(runnable)
-        if (isBound) {
-            unbindService(connection)
-            isBound = false
-        }
+        if (isBound) unbindService(connection)
     }
 }
