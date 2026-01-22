@@ -34,13 +34,13 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var ivAlbumArt: ImageView
     private lateinit var tvCurrentTime: TextView
     private lateinit var tvTotalTime: TextView
+    private lateinit var btnRepeat: ImageButton
+    private lateinit var btnShuffle: ImageButton
 
     // Variables de Lógica
     private var songList: ArrayList<String> = arrayListOf()
     private var folderPath: String? = null
     private var currentPosition: Int = 0
-    private var isRepeat: Boolean = false
-    private var isShuffle: Boolean = false
 
     // Hilo para actualizar la barra de progreso
     private val handler = Handler(Looper.getMainLooper())
@@ -59,8 +59,17 @@ class PlayerActivity : AppCompatActivity() {
                 musicService?.setList(songList, it, currentPosition)
             }
 
-            // 2. Iniciamos la música
-            playSongFromIntent()
+            // 2. Sincronizar UI inicial con el estado del servicio
+            updateShuffleUI()
+            updateRepeatUI()
+            
+            // 3. Iniciamos la música o actualizamos si ya está sonando
+            if (musicService?.currentSongPath == null) {
+                playSongFromIntent()
+            } else {
+                updateUIFromService()
+            }
+            
             startSeekBarUpdater()
         }
 
@@ -89,8 +98,8 @@ class PlayerActivity : AppCompatActivity() {
         
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
         val btnPrev = findViewById<ImageButton>(R.id.btnPrev)
-        val btnRepeat = findViewById<ImageButton>(R.id.btnRepeat)
-        val btnShuffle = findViewById<ImageButton>(R.id.btnShuffle)
+        btnRepeat = findViewById(R.id.btnRepeat)
+        btnShuffle = findViewById(R.id.btnShuffle)
 
         // 3. Configurar Botones (Ahora usan la lógica del servicio)
         btnPlayPause.setOnClickListener {
@@ -109,13 +118,17 @@ class PlayerActivity : AppCompatActivity() {
         }
 
         btnRepeat.setOnClickListener {
-            isRepeat = !isRepeat
-            btnRepeat.setColorFilter(if (isRepeat) Color.CYAN else Color.WHITE)
+            musicService?.let {
+                it.isRepeat = !it.isRepeat
+                updateRepeatUI()
+            }
         }
 
         btnShuffle.setOnClickListener {
-            isShuffle = !isShuffle
-            btnShuffle.setColorFilter(if (isShuffle) Color.CYAN else Color.WHITE)
+            musicService?.let {
+                it.isShuffle = !it.isShuffle
+                updateShuffleUI()
+            }
         }
 
         // 4. Configurar SeekBar
@@ -131,6 +144,18 @@ class PlayerActivity : AppCompatActivity() {
         val intent = Intent(this, MusicService::class.java)
         startService(intent)
         bindService(intent, connection, BIND_AUTO_CREATE)
+    }
+
+    private fun updateShuffleUI() {
+        val active = musicService?.isShuffle ?: false
+        btnShuffle.setColorFilter(if (active) Color.CYAN else Color.WHITE)
+        btnShuffle.alpha = if (active) 1.0f else 0.6f
+    }
+
+    private fun updateRepeatUI() {
+        val active = musicService?.isRepeat ?: false
+        btnRepeat.setColorFilter(if (active) Color.CYAN else Color.WHITE)
+        btnRepeat.alpha = if (active) 1.0f else 0.6f
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -165,7 +190,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // Nueva función para actualizar la pantalla cuando el servicio cambia de canción solo
     private fun updateUIFromService() {
         handler.postDelayed({
             musicService?.let {
@@ -198,7 +222,6 @@ class PlayerActivity : AppCompatActivity() {
                 tvCurrentTime.text = formatDuration(currentPos.toLong())
                 tvTotalTime.text = formatDuration(duration.toLong())
 
-                // Si el título en pantalla es distinto al que suena (porque cambió en la notificación)
                 if (tvTitle.text != service.currentSongTitle) {
                     tvTitle.text = service.currentSongTitle
                     updateAlbumArt(service.currentSongPath)

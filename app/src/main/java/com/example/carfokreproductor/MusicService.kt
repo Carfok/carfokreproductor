@@ -18,6 +18,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import java.io.File
+import kotlin.random.Random
 
 class MusicService : Service() {
 
@@ -30,6 +31,10 @@ class MusicService : Service() {
     private var songList: List<String> = emptyList()
     private var currentPosition: Int = 0
     private var folderPath: String? = null
+
+    // Estados de reproducción
+    var isShuffle = false
+    var isRepeat = false
 
     private lateinit var mediaSession: MediaSessionCompat
     private val CHANNEL_ID = "carfok_music_channel"
@@ -98,7 +103,13 @@ class MusicService : Service() {
             setDataSource(path)
             prepare()
             start()
-            setOnCompletionListener { playNext() }
+            setOnCompletionListener { 
+                if (isRepeat) {
+                    startMusic(currentSongPath!!) // Repetir misma canción
+                } else {
+                    playNext() // Siguiente (normal o shuffle)
+                }
+            }
         }
 
         updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
@@ -159,7 +170,6 @@ class MusicService : Service() {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
             )
         } else {
-            // Al pausar, dejamos de ser foreground pero mantenemos la notificación
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 stopForeground(STOP_FOREGROUND_DETACH)
             } else {
@@ -174,7 +184,13 @@ class MusicService : Service() {
     @RequiresApi(Build.VERSION_CODES.Q)
     fun playNext() {
         if (songList.isEmpty() || folderPath == null) return
-        currentPosition = (currentPosition + 1) % songList.size
+        
+        if (isShuffle) {
+            currentPosition = Random.nextInt(songList.size)
+        } else {
+            currentPosition = (currentPosition + 1) % songList.size
+        }
+
         val nextPath = File(folderPath, songList[currentPosition]).absolutePath
         startMusic(nextPath)
     }
