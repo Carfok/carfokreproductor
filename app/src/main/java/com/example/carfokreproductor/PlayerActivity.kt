@@ -19,6 +19,7 @@ import android.widget.TextView
 import androidx.annotation.RequiresApi
 import androidx.appcompat.app.AppCompatActivity
 import java.io.File
+import java.util.concurrent.TimeUnit
 
 class PlayerActivity : AppCompatActivity() {
 
@@ -31,6 +32,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var tvTitle: TextView
     private lateinit var btnPlayPause: ImageButton
     private lateinit var ivAlbumArt: ImageView
+    private lateinit var tvCurrentTime: TextView
+    private lateinit var tvTotalTime: TextView
 
     // Variables de Lógica
     private var songList: ArrayList<String> = arrayListOf()
@@ -81,6 +84,9 @@ class PlayerActivity : AppCompatActivity() {
         btnPlayPause = findViewById(R.id.btnPlayPause)
         seekBar = findViewById(R.id.playerSeekBar)
         ivAlbumArt = findViewById(R.id.ivAlbumArt)
+        tvCurrentTime = findViewById(R.id.tvCurrentTime)
+        tvTotalTime = findViewById(R.id.tvTotalTime)
+        
         val btnNext = findViewById<ImageButton>(R.id.btnNext)
         val btnPrev = findViewById<ImageButton>(R.id.btnPrev)
         val btnRepeat = findViewById<ImageButton>(R.id.btnRepeat)
@@ -183,8 +189,14 @@ class PlayerActivity : AppCompatActivity() {
     private fun startSeekBarUpdater() {
         runnable = Runnable {
             musicService?.let { service ->
-                seekBar.max = service.getDuration()
-                seekBar.progress = service.getCurrentPosition()
+                val duration = service.getDuration()
+                val currentPos = service.getCurrentPosition()
+                
+                seekBar.max = duration
+                seekBar.progress = currentPos
+                
+                tvCurrentTime.text = formatDuration(currentPos.toLong())
+                tvTotalTime.text = formatDuration(duration.toLong())
 
                 // Si el título en pantalla es distinto al que suena (porque cambió en la notificación)
                 if (tvTitle.text != service.currentSongTitle) {
@@ -192,9 +204,15 @@ class PlayerActivity : AppCompatActivity() {
                     updateAlbumArt(service.currentSongPath)
                 }
             }
-            handler.postDelayed(runnable, 500)
+            handler.postDelayed(runnable, 1000)
         }
         handler.post(runnable)
+    }
+
+    private fun formatDuration(duration: Long): String {
+        val minutes = TimeUnit.MILLISECONDS.toMinutes(duration)
+        val seconds = TimeUnit.MILLISECONDS.toSeconds(duration) - TimeUnit.MINUTES.toSeconds(minutes)
+        return String.format("%02d:%02d", minutes, seconds)
     }
 
     override fun onDestroy() {

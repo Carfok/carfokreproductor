@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.graphics.BitmapFactory
 import android.media.MediaPlayer
 import android.os.Binder
@@ -41,10 +42,6 @@ class MusicService : Service() {
     override fun onCreate() {
         super.onCreate()
         mediaSession = MediaSessionCompat(this, "MusicService")
-
-        // Eliminados flags deprecados (FLAG_HANDLES_MEDIA_BUTTONS y FLAG_HANDLES_TRANSPORT_CONTROLS)
-        // ya que el sistema los gestiona automáticamente ahora.
-
         mediaSession.isActive = true
 
         mediaSession.setCallback(object : MediaSessionCompat.Callback() {
@@ -82,7 +79,6 @@ class MusicService : Service() {
         }
     }
 
-    /*  Método para que la Activity pase la lista al Servicio */
     fun setList(list: List<String>, path: String, position: Int) {
         songList = list
         folderPath = path
@@ -93,10 +89,10 @@ class MusicService : Service() {
     fun startMusic(path: String) {
         currentSongTitle = File(path).nameWithoutExtension
 
-        // Evitar reiniciar si es la misma canción sonando
         if (currentSongPath == path && mediaPlayer?.isPlaying == true) return
 
-        stopMusic()
+        releasePlayer()
+
         currentSongPath = path
         mediaPlayer = MediaPlayer().apply {
             setDataSource(path)
@@ -108,6 +104,71 @@ class MusicService : Service() {
         updatePlaybackState(PlaybackStateCompat.STATE_PLAYING)
         updateMetaData()
         showNotification(true)
+    }
+
+    private fun releasePlayer() {
+        mediaPlayer?.stop()
+        mediaPlayer?.release()
+        mediaPlayer = null
+    }
+
+    fun stopMusic() {
+        releasePlayer()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+        } else {
+            @Suppress("DEPRECATION")
+            stopForeground(true)
+        }
+        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun showNotification(isPlaying: Boolean) {
+        val intent = Intent(this, PlayerActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP
+        }
+        val contentIntent = PendingIntent.getActivity(
+            this, 0, intent, PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val iconPlayPause = if (isPlaying) R.drawable.pause_circle_24px else R.drawable.play_circle_24px
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(currentSongTitle)
+            .setContentText("Carfok Music Player")
+            .setSmallIcon(R.drawable.play_circle_24px)
+            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.play_circle_24px))
+            .setContentIntent(contentIntent)
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setOnlyAlertOnce(true)
+            .setOngoing(isPlaying)
+            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
+                .setMediaSession(mediaSession.sessionToken)
+                .setShowActionsInCompactView(0, 1, 2)
+            )
+            .addAction(R.drawable.skip_previous_24px, "Anterior", getPendingIntent("ACTION_PREV"))
+            .addAction(iconPlayPause, if (isPlaying) "Pausa" else "Play", getPendingIntent("ACTION_PLAY_PAUSE"))
+            .addAction(R.drawable.skip_next_24px, "Siguiente", getPendingIntent("ACTION_NEXT"))
+            .build()
+
+        if (isPlaying) {
+            startForeground(
+                NOTIFICATION_ID,
+                notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+            )
+        } else {
+            // Al pausar, dejamos de ser foreground pero mantenemos la notificación
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                stopForeground(STOP_FOREGROUND_DETACH)
+            } else {
+                @Suppress("DEPRECATION")
+                stopForeground(false)
+            }
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.notify(NOTIFICATION_ID, notification)
+        }
     }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -139,14 +200,6 @@ class MusicService : Service() {
                 showNotification(true)
             }
         }
-    }
-
-    fun stopMusic() {
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
-        mediaPlayer = null
-        stopForeground(STOP_FOREGROUND_REMOVE)
-        updatePlaybackState(PlaybackStateCompat.STATE_STOPPED)
     }
 
     fun isPlaying(): Boolean = mediaPlayer?.isPlaying ?: false
@@ -194,36 +247,6 @@ class MusicService : Service() {
             .build()
 
         mediaSession.setMetadata(builder)
-    }
-
-    @RequiresApi(Build.VERSION_CODES.Q)
-    private fun showNotification(isPlaying: Boolean) {
-        val contentIntent = PendingIntent.getActivity(
-            this, 0, Intent(this, PlayerActivity::class.java), PendingIntent.FLAG_IMMUTABLE
-        )
-
-        // Botones de acción
-        val iconPlayPause = if (isPlaying) R.drawable.pause_circle_24px else R.drawable.play_circle_24px
-
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(currentSongTitle)
-            .setContentText("Carfok Music Player")
-            .setSmallIcon(R.drawable.play_circle_24px)
-            .setLargeIcon(BitmapFactory.decodeResource(resources, R.drawable.play_circle_24px))
-            .setContentIntent(contentIntent)
-            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setOnlyAlertOnce(true)
-            .setOngoing(isPlaying)
-            .setStyle(androidx.media.app.NotificationCompat.MediaStyle()
-                .setMediaSession(mediaSession.sessionToken)
-                .setShowActionsInCompactView(0, 1, 2)
-            )
-            .addAction(R.drawable.skip_previous_24px, "Anterior", getPendingIntent("ACTION_PREV"))
-            .addAction(iconPlayPause, if (isPlaying) "Pausa" else "Play", getPendingIntent("ACTION_PLAY_PAUSE"))
-            .addAction(R.drawable.skip_next_24px, "Siguiente", getPendingIntent("ACTION_NEXT"))
-            .build()
-
-        startForeground(NOTIFICATION_ID, notification, android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK)
     }
 
     private fun getPendingIntent(action: String): PendingIntent {
