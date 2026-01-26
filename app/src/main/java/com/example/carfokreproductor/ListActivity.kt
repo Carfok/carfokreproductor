@@ -120,6 +120,8 @@ class ListActivity : AppCompatActivity() {
 
         miniPlayerLayout.setOnClickListener {
             val intent = Intent(this, PlayerActivity::class.java)
+            // Asegurar que no se duplique la actividad
+            intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             startActivity(intent)
         }
 
@@ -190,11 +192,23 @@ class ListActivity : AppCompatActivity() {
         songNamesFull = songFiles.map { it.name }
     }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private fun playSong(songName: String) {
+        val position = songNamesFull.indexOf(songName)
+        val fullPath = File(musicFolder, songName).absolutePath
+        
+        // Si el servicio ya está vinculado, le pedimos que cambie la canción inmediatamente
+        if (isBound && musicService != null) {
+            musicService?.setList(ArrayList(songNamesFull), musicFolder.absolutePath, position)
+            musicService?.startMusic(fullPath)
+        }
+
         val intent = Intent(this, PlayerActivity::class.java)
         intent.putStringArrayListExtra("SONG_LIST", ArrayList(songNamesFull))
         intent.putExtra("FOLDER_PATH", musicFolder.absolutePath)
-        intent.putExtra("POSITION", songNamesFull.indexOf(songName))
+        intent.putExtra("POSITION", position)
+        // Agregamos flags para evitar múltiples instancias de PlayerActivity y manejar la transición
+        intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
     }
 
