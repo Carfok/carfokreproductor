@@ -2,45 +2,47 @@
 
 **Carfok Reproductor** es un reproductor de música moderno para Android, diseñado con **Material Design 3** y enfocado en ofrecer una experiencia visual atractiva y funcional.
 
-## 🚀 Características
+## 🚀 Características Principales
 
-- **Reproducción Local**: Escanea y reproduce archivos de audio (MP3, WAV, AAC, etc.) desde la carpeta local `Music/CarfokMusic`.
-- **Diseño Moderno**: Interfaz de usuario actualizada con Material 3, gradientes personalizados y componentes visuales elegantes.
-- **Gestión de Listas de Reproducción**: Crea, edita y gestiona tus propias playlists de forma sencilla.
-- **Metadatos y Carátulas**: Extracción automática de carátulas y títulos directamente desde los metadatos de los archivos de audio.
-- **Reproducción en Segundo Plano**: Utiliza un *Foreground Service* para mantener la música sonando incluso con la pantalla apagada o la app en segundo plano.
-- **Control por Notificaciones**: Notificación interactiva con controles de reproducción sincronizados mediante *MediaSession*.
-- **Inteligencia en Llamadas**: Pausa automáticamente la música al recibir una llamada y la reanuda al finalizar (si estaba sonando).
-- **Modos de Reproducción**: Soporte para modo aleatorio (*Shuffle*) y repetición (*Repeat*).
+### 🎵 Reproducción de Audio
+- **Escaneo Local**: Detecta automáticamente archivos de audio (MP3, WAV, AAC, OGG, M4A, FLAC) en la carpeta `Music/CarfokMusic`.
+- **Reproducción en Segundo Plano**: Utiliza un *Foreground Service* para mantener la música activa con la pantalla apagada o usando otras apps.
+- **Modos de Reproducción**: Soporte completo para modo aleatorio (*Shuffle*) y modo repetición (*Repeat*).
+- **Control por Notificaciones**: Notificación interactiva con controles multimedia sincronizados mediante *MediaSession*.
+- **Gestión de Llamadas**: Pausa automática al recibir llamadas y reanudación al finalizar (opcional).
+
+### 📂 Gestión de Biblioteca y Listas
+- **Playlists Personalizadas**: Crea, renombra y gestiona múltiples listas de reproducción.
+- **Organización Drag & Drop**: Reordena las canciones dentro de tus playlists simplemente arrastrándolas.
+- **Borrado Inteligente**:
+    - **Quitar de la lista**: Elimina la canción de una playlist específica sin borrar el archivo.
+    - **Borrado Físico**: Elimina el archivo de audio directamente desde la aplicación, limpiando automáticamente sus referencias en todas las playlists.
+- **Búsqueda en Tiempo Real**: Filtra rápidamente canciones por nombre en la lista principal.
+
+### 🎨 Interfaz y Experiencia Visual
+- **Diseño Material 3**: UI moderna con gradientes, tarjetas elevadas y componentes visuales elegantes.
+- **Mini Reproductor (MiniPlayer)**: Control persistente en la parte inferior de la lista para gestionar la música sin cambiar de pantalla.
+- **Extracción de Metadatos**: Carga dinámica de carátulas (Album Art) y títulos directamente desde los archivos de audio.
+- **Sincronización de UI**: La barra de progreso, el tiempo y los iconos se actualizan en tiempo real en todas las pantallas.
 
 ## 🛠️ Detalles Técnicos
 
 ### Requisitos
-- Android SDK 24+ (Nougat o superior).
-- Permisos de lectura de almacenamiento externo o archivos multimedia.
-- Los archivos deben estar ubicados en: `Almacenamiento Interno > Music > CarfokMusic`.
+- **SO**: Android SDK 24+ (Nougat o superior).
+- **Ubicación de archivos**: `Almacenamiento Interno > Music > CarfokMusic`.
 
-### Tecnologías Utilizadas
+### Tecnologías y APIs
 - **Lenguaje**: Kotlin.
-- **UI**: XML con componentes de Material 3 y ConstraintLayout.
-- **Arquitectura**: Activities y Foreground Service para la lógica de audio.
-- **Multimedia**: `MediaPlayer`, `MediaSessionCompat` y `MediaMetadataRetriever`.
+- **Audio**: `MediaPlayer`, `MediaSessionCompat` para controles externos.
+- **Multimedia**: `MediaMetadataRetriever` para extracción de imágenes y datos.
+- **Persistencia**: `SharedPreferences` con `Gson` para almacenar playlists.
+- **UI**: `RecyclerView` con `DiffUtil` para actualizaciones fluidas y `ItemTouchHelper` para gestos.
 
-### Permisos Clave
-- `READ_EXTERNAL_STORAGE` / `READ_MEDIA_AUDIO`: Para acceder a la música.
-- `WAKE_LOCK`: Para evitar que el procesador se duerma durante la reproducción.
-- `FOREGROUND_SERVICE`: Para la reproducción en segundo plano.
-- `READ_PHONE_STATE`: Para gestionar el estado de la música durante las llamadas.
-- `POST_NOTIFICATIONS`: Para mostrar los controles en la barra de estado (Android 13+).
-
-## 📦 Estructura del Proyecto
-
-- **ListActivity**: Pantalla principal con el listado de todas las canciones.
-- **PlayerActivity**: Interfaz detallada del reproductor con carátula grande y controles avanzados.
-- **PlaylistActivity**: Gestión de las listas de reproducción creadas.
-- **PlaylistSongsActivity**: Visualización de las canciones dentro de una lista específica.
-- **MusicService**: El "cerebro" que gestiona la reproducción de audio en segundo plano.
-- **PlaylistManager**: Encargado de la persistencia de las listas de reproducción (JSON/SharedPreferences).
+### Permisos Requeridos
+- `READ_EXTERNAL_STORAGE` / `READ_MEDIA_AUDIO`: Acceso a la música.
+- `POST_NOTIFICATIONS`: Controles en la barra de estado (Android 13+).
+- `FOREGROUND_SERVICE`: Reproducción continua.
+- `READ_PHONE_STATE`: Control de audio durante llamadas.
 
 ---
-Desarrollado como un reproductor ligero, vistoso y eficiente.
+**Carfok Reproductor** - Potencia y diseño en la palma de tu mano.
