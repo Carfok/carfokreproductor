@@ -34,6 +34,17 @@ class PlaylistManager(context: Context) {
         }
     }
 
+    // Elimina la canción de todas las listas de reproducción (usado al borrar el archivo físico)
+    fun removeSongFromAllPlaylists(songPath: String) {
+        var changed = false
+        playlists.values.forEach { list ->
+            if (list.remove(songPath)) {
+                changed = true
+            }
+        }
+        if (changed) save()
+    }
+
     // Nuevo método para actualizar el orden de una playlist
     fun savePlaylistOrder(playlistName: String, newList: List<String>) {
         playlists[playlistName] = newList.toMutableList()

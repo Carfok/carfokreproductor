@@ -50,6 +50,7 @@ class ListActivity : AppCompatActivity() {
     private lateinit var tvMiniTitle: TextView
     private lateinit var btnMiniPlayPause: ImageButton
     private lateinit var ivMiniIcon: ImageView
+    private var lastMiniPath: String? = null
 
     private val handler = Handler(Looper.getMainLooper())
     private lateinit var updateTask: Runnable
@@ -74,7 +75,7 @@ class ListActivity : AppCompatActivity() {
         setContentView(R.layout.activity_list)
 
         playlistManager = PlaylistManager(this)
-        checkNotificationPermission()
+        checkPermissions()
 
         val recyclerView = findViewById<RecyclerView>(R.id.recyclerViewSongs)
         val searchView = findViewById<SearchView>(R.id.searchView)
@@ -98,7 +99,7 @@ class ListActivity : AppCompatActivity() {
             ArrayList(songNamesFull),
             musicFolder.absolutePath,
             onItemClick = { songName -> playSong(songName) },
-            onOptionClick = { songName -> showAddToPlaylistDialog(songName) }
+            onOptionClick = { songName -> showSongOptionsDialog(songName) }
         )
         recyclerView.adapter = adapter
 
@@ -120,7 +121,6 @@ class ListActivity : AppCompatActivity() {
 
         miniPlayerLayout.setOnClickListener {
             val intent = Intent(this, PlayerActivity::class.java)
-            // Asegurar que no se duplique la actividad
             intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
             startActivity(intent)
         }
@@ -160,10 +160,12 @@ class ListActivity : AppCompatActivity() {
                 miniPlayerLayout.visibility = View.VISIBLE
                 tvMiniTitle.text = service.currentSongTitle
 
-                // Cargar imagen en mini player
-                val art = getAlbumArt(service.currentSongPath!!)
-                if (art != null) ivMiniIcon.setImageBitmap(art)
-                else ivMiniIcon.setImageResource(R.drawable.play_circle_24px)
+                if (lastMiniPath != service.currentSongPath) {
+                    lastMiniPath = service.currentSongPath
+                    val art = getAlbumArt(service.currentSongPath!!)
+                    if (art != null) ivMiniIcon.setImageBitmap(art)
+                    else ivMiniIcon.setImageResource(R.drawable.play_circle_24px)
+                }
 
                 val isPlaying = service.isPlaying()
                 btnMiniPlayPause.setImageResource(
@@ -180,8 +182,16 @@ class ListActivity : AppCompatActivity() {
         return try {
             retriever.setDataSource(path)
             val art = retriever.embeddedPicture
-            if (art != null) BitmapFactory.decodeByteArray(art, 0, art.size) else null
-        } catch (e: Exception) { null } finally { retriever.release() }
+            if (art != null) {
+                val options = BitmapFactory.Options()
+                options.inSampleSize = 2
+                BitmapFactory.decodeByteArray(art, 0, art.size, options)
+            } else null
+        } catch (e: Exception) {
+            null
+        } finally {
+            try { retriever.release() } catch (e: Exception) {}
+        }
     }
 
     private fun loadSongs() {
@@ -197,7 +207,6 @@ class ListActivity : AppCompatActivity() {
         val position = songNamesFull.indexOf(songName)
         val fullPath = File(musicFolder, songName).absolutePath
         
-        // Si el servicio ya está vinculado, le pedimos que cambie la canción inmediatamente
         if (isBound && musicService != null) {
             musicService?.setList(ArrayList(songNamesFull), musicFolder.absolutePath, position)
             musicService?.startMusic(fullPath)
@@ -207,7 +216,6 @@ class ListActivity : AppCompatActivity() {
         intent.putStringArrayListExtra("SONG_LIST", ArrayList(songNamesFull))
         intent.putExtra("FOLDER_PATH", musicFolder.absolutePath)
         intent.putExtra("POSITION", position)
-        // Agregamos flags para evitar múltiples instancias de PlayerActivity y manejar la transición
         intent.flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
         startActivity(intent)
     }
@@ -232,6 +240,19 @@ class ListActivity : AppCompatActivity() {
         builder.show()
     }
 
+    private fun showSongOptionsDialog(songName: String) {
+        val options = arrayOf("Añadir a lista...", "Eliminar de la carpeta")
+        AlertDialog.Builder(this)
+            .setTitle(songName)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showAddToPlaylistDialog(songName)
+                    1 -> showDeleteConfirmation(songName)
+                }
+            }
+            .show()
+    }
+
     private fun showAddToPlaylistDialog(songName: String) {
         val playlists = playlistManager.getPlaylistNames()
         if (playlists.isEmpty()) {
@@ -250,6 +271,55 @@ class ListActivity : AppCompatActivity() {
         builder.show()
     }
 
+    private fun showDeleteConfirmation(songName: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar canción")
+            .setMessage("¿Estás seguro de que quieres eliminar '$songName' de la carpeta CarfokMusic? Esto también la quitará de todas tus listas.")
+            .setPositiveButton("Eliminar") { _, _ ->
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    deleteSong(songName)
+                } else {
+                    // Fallback para versiones antiguas
+                    val file = File(musicFolder, songName)
+                    if (file.exists() && file.delete()) {
+                        playlistManager.removeSongFromAllPlaylists(file.absolutePath)
+                        loadSongs()
+                        adapter.updateList(songNamesFull)
+                        Toast.makeText(this, "Canción eliminada", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.Q)
+    private fun deleteSong(songName: String) {
+        val file = File(musicFolder, songName)
+        val fullPath = file.absolutePath
+        
+        if (file.exists()) {
+            if (isBound && musicService?.currentSongPath == fullPath) {
+                musicService?.playNext()
+                if (songNamesFull.size <= 1) {
+                    musicService?.stopMusic()
+                }
+            }
+
+            if (file.delete()) {
+                playlistManager.removeSongFromAllPlaylists(fullPath)
+                loadSongs()
+                adapter.updateList(songNamesFull)
+                if (isBound) {
+                    musicService?.setList(ArrayList(songNamesFull), musicFolder.absolutePath, -1)
+                }
+                Toast.makeText(this, "Canción eliminada", Toast.LENGTH_SHORT).show()
+            } else {
+                Toast.makeText(this, "No se pudo eliminar el archivo", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     private fun filter(text: String?) {
         val filteredList = ArrayList<String>()
         for (item in songNamesFull) {
@@ -260,16 +330,19 @@ class ListActivity : AppCompatActivity() {
         adapter.updateList(filteredList)
     }
 
-    private fun checkNotificationPermission() {
+    private fun checkPermissions() {
+        val permissions = mutableListOf(Manifest.permission.READ_EXTERNAL_STORAGE)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(
-                    this,
-                    arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                    101
-                )
-            }
+            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
+            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+        }
+        
+        val toRequest = permissions.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+
+        if (toRequest.isNotEmpty()) {
+            ActivityCompat.requestPermissions(this, toRequest.toTypedArray(), 101)
         }
     }
 
@@ -308,7 +381,6 @@ class ListActivity : AppCompatActivity() {
             val songName = songs[position]
             holder.tvTitle.text = songName
             
-            // Cargar imagen real de la canción
             val fullPath = File(folderPath, songName).absolutePath
             val art = getAlbumArt(fullPath)
             if (art != null) holder.ivIcon.setImageBitmap(art)
@@ -323,8 +395,16 @@ class ListActivity : AppCompatActivity() {
             return try {
                 retriever.setDataSource(path)
                 val art = retriever.embeddedPicture
-                if (art != null) BitmapFactory.decodeByteArray(art, 0, art.size) else null
-            } catch (e: Exception) { null } finally { retriever.release() }
+                if (art != null) {
+                    val options = BitmapFactory.Options()
+                    options.inSampleSize = 4
+                    BitmapFactory.decodeByteArray(art, 0, art.size, options)
+                } else null
+            } catch (e: Exception) {
+                null
+            } finally {
+                try { retriever.release() } catch (e: Exception) {}
+            }
         }
 
         override fun getItemCount() = songs.size

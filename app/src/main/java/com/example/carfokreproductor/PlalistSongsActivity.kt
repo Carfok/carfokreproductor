@@ -64,7 +64,7 @@ class PlaylistSongsActivity : AppCompatActivity() {
             songNames,
             musicFolder.absolutePath,
             onItemClick = { songName: String -> playSong(songName) },
-            onOptionClick = { songName: String -> showRemoveDialog(songName) }
+            onOptionClick = { songName: String -> showSongOptionsDialog(songName) }
         )
         rvSongs.adapter = adapter
 
@@ -87,9 +87,9 @@ class PlaylistSongsActivity : AppCompatActivity() {
                 super.clearView(recyclerView, viewHolder)
                 // Al soltar, guardamos el nuevo orden
                 playlistManager.savePlaylistOrder(playlistName, songPaths)
-                // Si la música está sonando y es esta lista, actualizamos el servicio para que el orden sea el nuevo
+                // Si la música está sonando y es esta lista, actualizamos el servicio
                 if (isBound && musicService != null) {
-                    musicService?.setList(songNames, musicFolder.absolutePath, -1) // -1 indica que no cambie la canción actual pero sí el "cerebro" de la lista
+                    musicService?.setList(songNames, musicFolder.absolutePath, -1)
                 }
             }
         })
@@ -128,13 +128,11 @@ class PlaylistSongsActivity : AppCompatActivity() {
         val musicFolder = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_MUSIC), "CarfokMusic")
         val fullPath = File(musicFolder, songName).absolutePath
 
-        // 1. Actualizar el servicio de inmediato
         if (isBound && musicService != null) {
             musicService?.setList(songNames, musicFolder.absolutePath, position)
             musicService?.startMusic(fullPath)
         }
 
-        // 2. Ir al reproductor (o traerlo al frente)
         val intent = Intent(this, PlayerActivity::class.java).apply {
             putStringArrayListExtra("SONG_LIST", songNames)
             putExtra("FOLDER_PATH", musicFolder.absolutePath)
@@ -144,7 +142,20 @@ class PlaylistSongsActivity : AppCompatActivity() {
         startActivity(intent)
     }
 
-    private fun showRemoveDialog(songName: String) {
+    private fun showSongOptionsDialog(songName: String) {
+        val options = arrayOf("Quitar de la lista", "Eliminar de la carpeta")
+        AlertDialog.Builder(this)
+            .setTitle(songName)
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showRemoveFromPlaylistDialog(songName)
+                    1 -> showDeleteFromFolderConfirmation(songName)
+                }
+            }
+            .show()
+    }
+
+    private fun showRemoveFromPlaylistDialog(songName: String) {
         AlertDialog.Builder(this)
             .setTitle("Quitar canción")
             .setMessage("¿Quitar '$songName' de la lista $playlistName?")
@@ -162,9 +173,29 @@ class PlaylistSongsActivity : AppCompatActivity() {
             .show()
     }
 
+    private fun showDeleteFromFolderConfirmation(songName: String) {
+        AlertDialog.Builder(this)
+            .setTitle("Eliminar archivo")
+            .setMessage("¿Estás seguro de que quieres eliminar '$songName' de la carpeta CarfokMusic? Se borrará permanentemente de todas las listas.")
+            .setPositiveButton("Eliminar") { _, _ ->
+                val index = songNames.indexOf(songName)
+                if (index != -1) {
+                    val file = File(songPaths[index])
+                    val fullPath = file.absolutePath
+                    if (file.exists() && file.delete()) {
+                        playlistManager.removeSongFromAllPlaylists(fullPath)
+                        loadSongs()
+                        adapter.updateList(songNames)
+                        Toast.makeText(this, "Archivo eliminado", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+            .setNegativeButton("Cancelar", null)
+            .show()
+    }
+
     override fun onResume() {
         super.onResume()
-        // No recargamos todo si no es necesario para evitar que el scroll o el orden visual parpadeen
         val currentNames = ArrayList(songNames)
         loadSongs()
         if (currentNames != songNames) {
